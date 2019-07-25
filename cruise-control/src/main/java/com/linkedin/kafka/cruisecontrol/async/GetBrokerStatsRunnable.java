@@ -10,6 +10,8 @@ import com.linkedin.kafka.cruisecontrol.monitor.ModelCompletenessRequirements;
 import com.linkedin.kafka.cruisecontrol.servlet.parameters.ClusterLoadParameters;
 import com.linkedin.kafka.cruisecontrol.servlet.response.stats.BrokerStats;
 
+import scala.annotation.meta.param;
+
 
 /**
  * The async runnable to get the {@link BrokerStats} for the cluster model.
@@ -22,6 +24,7 @@ class GetBrokerStatsRunnable extends OperationRunnable {
   private final ModelCompletenessRequirements _modelCompletenessRequirements;
   private final boolean _allowCapacityEstimation;
   private final KafkaCruiseControlConfig _config;
+  private final boolean _capacity;
 
   GetBrokerStatsRunnable(KafkaCruiseControl kafkaCruiseControl,
                          OperationFuture future,
@@ -32,10 +35,18 @@ class GetBrokerStatsRunnable extends OperationRunnable {
     _modelCompletenessRequirements = parameters.requirements();
     _allowCapacityEstimation = parameters.allowCapacityEstimation();
     _config = config;
+    _capacity = parameters.capacity();
   }
 
   @Override
   protected BrokerStats getResult() throws Exception {
+    if (_capacity) {
+        return _kafkaCruiseControl.clusterModel(_time,
+                                                _modelCompletenessRequirements,
+                                                _future.operationProgress(),
+                                                _allowCapacityEstimation).brokerCapacityStats(_config);
+    }
+
     // Check whether the cached broker stats is still valid.
     BrokerStats cachedBrokerStats = _kafkaCruiseControl.cachedBrokerLoadStats(_allowCapacityEstimation);
     if (cachedBrokerStats != null) {

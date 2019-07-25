@@ -105,6 +105,7 @@ public class ParameterUtils {
   public static final String REPLICATION_FACTOR_PARAM = "replication_factor";
   public static final String SKIP_RACK_AWARENESS_CHECK_PARAM = "skip_rack_awareness_check";
   public static final String FETCH_COMPLETED_TASK_PARAM = "fetch_completed_task";
+  private static final String CAPACITY_PARAM = "capacity";
   private static final int MAX_REASON_LENGTH = 50;
 
   private static final Map<EndPoint, Set<String>> VALID_ENDPOINT_PARAM_NAMES;
@@ -459,6 +460,10 @@ public class ParameterUtils {
   static boolean throttleAddedOrRemovedBrokers(HttpServletRequest request, EndPoint endPoint) {
     return endPoint == ADD_BROKER ? getBooleanParam(request, THROTTLE_ADDED_BROKER_PARAM, true)
                                   : getBooleanParam(request, THROTTLE_REMOVED_BROKER_PARAM, true);
+  }
+
+  static boolean capacity(HttpServletRequest request) {
+    return getBooleanParam(request, CAPACITY_PARAM, false);
   }
 
   static long time(HttpServletRequest request) {
