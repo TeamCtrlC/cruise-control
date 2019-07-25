@@ -20,7 +20,7 @@ import java.util.Map;
  * <pre>
  * Get the cluster load
  *    GET /kafkacruisecontrol/load?start=[START_TIMESTAMP]&amp;end=[END_TIMESTAMP]&amp;time=[END_TIMESTAMP]&amp;allow_capacity_estimation=[true/false]
- *    &amp;json=[true/false]
+ *    &amp;json=[true/false];&capacity=[true/false]
  * </pre>
  */
 public class ClusterLoadParameters extends AbstractParameters {
@@ -28,6 +28,8 @@ public class ClusterLoadParameters extends AbstractParameters {
   protected long _startMs;
   protected ModelCompletenessRequirements _requirements;
   protected boolean _allowCapacityEstimation;
+  private boolean _capacity;
+
 
   public ClusterLoadParameters() {
     super();
@@ -41,6 +43,7 @@ public class ClusterLoadParameters extends AbstractParameters {
     _startMs = ParameterUtils.startMs(_request);
     _requirements = new ModelCompletenessRequirements(1, 0.0, true);
     _allowCapacityEstimation = ParameterUtils.allowCapacityEstimation(_request);
+    _capacity = ParameterUtils.capacity(_request);
   }
 
   public long startMs() {
@@ -62,5 +65,9 @@ public class ClusterLoadParameters extends AbstractParameters {
   @Override
   public void configure(Map<String, ?> configs) {
     super.configure(configs);
+  }
+  
+  public boolean capacity() {
+    return _capacity;
   }
 }
