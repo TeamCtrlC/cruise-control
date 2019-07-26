@@ -10,8 +10,6 @@ import com.linkedin.kafka.cruisecontrol.monitor.ModelCompletenessRequirements;
 import com.linkedin.kafka.cruisecontrol.servlet.parameters.ClusterLoadParameters;
 import com.linkedin.kafka.cruisecontrol.servlet.response.stats.BrokerStats;
 
-import scala.annotation.meta.param;
-
 
 /**
  * The async runnable to get the {@link BrokerStats} for the cluster model.
