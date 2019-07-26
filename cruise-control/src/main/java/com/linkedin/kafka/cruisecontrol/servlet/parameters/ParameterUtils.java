@@ -128,6 +128,7 @@ public class ParameterUtils {
     load.add(TIME_PARAM);
     load.add(JSON_PARAM);
     load.add(ALLOW_CAPACITY_ESTIMATION_PARAM);
+    load.add(CAPACITY_PARAM);
 
     Set<String> partitionLoad = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
     partitionLoad.add(RESOURCE_PARAM);
