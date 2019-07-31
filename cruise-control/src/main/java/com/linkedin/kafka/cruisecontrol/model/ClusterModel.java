@@ -1110,20 +1110,6 @@ public class ClusterModel implements Serializable {
     return brokerCapacityStats;
   }
 
-  public BrokerStats brokerCapacityStats(KafkaCruiseControlConfig config) {
-    BrokerStats brokerStats = new BrokerStats(config);
-    brokers().forEach(broker -> {
-      brokerStats.addSingleBrokerCapacityStats(broker.host().name(), 
-                                               broker.id(),
-                                               _capacityEstimationInfoByBrokerId.get(broker.id()) != null,
-                                               broker.rack().capacityFor(Resource.DISK),
-                                               broker.rack().capacityFor(Resource.CPU),
-                                               broker.rack().capacityFor(Resource.NW_IN),
-                                               broker.rack().capacityFor(Resource.NW_OUT));
-    });
-    return brokerStats;
-  }
-
   /**
    * The variance of the derived resources.
    * @return a non-null array where the ith index is the variance of RawAndDerivedResource.ordinal().
