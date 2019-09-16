@@ -1263,4 +1263,9 @@ public class KafkaCruiseControl {
       throw new IllegalArgumentException(String.format("Broker %s does not exist.", invalidBrokerIds));
     }
   }
+
+
+  public BrokerStats brokerCapacityStats(KafkaCruiseControlConfig config) throws Exception {
+    return _loadMonitor.brokerCapacityStats(config);
+  }
 }
