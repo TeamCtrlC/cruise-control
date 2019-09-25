@@ -1070,7 +1070,7 @@ public class ClusterModel implements Serializable {
   }
 
   /**
-   * Get broker return the broker stats (related to resource utilization).
+   * Return the broker stats related to resource utilization
    */
   public BrokerStats brokerStats(KafkaCruiseControlConfig config) {
     BrokerUtilizationStats brokerUtilizationStats = new BrokerUtilizationStats(config);
