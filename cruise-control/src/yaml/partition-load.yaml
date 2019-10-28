@@ -1,0 +1,76 @@
+/partition_load:
+  get:
+    summary: Get the resource load for each partition
+    parameters:
+      - name: allow_capacity_estimation
+        in: query
+        description: Whether to allow capacity estimation when cruise-control is unable to obtain all per-broker capacity information
+        schema:
+          type: boolean
+      - name: end
+        in: query
+        description: The timestamp in milliseconds since the Epoch to use as the end
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      - name: entries
+        in: query
+        description: The number of entries to show in the response
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+      - name: json
+        in: query
+        description: Whether cruise-control's response should be in JSON format
+        schema:
+          type: boolean
+      - name: max_load
+        in: query
+        description: Whether to return the peak load (max load) or the average load
+        schema:
+          type: boolean
+      - name: min_valid_partition_ratio
+        in: query
+        description: The minimum required ratio of monitored topics [0-1]
+        schema:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+      - name: partition
+        in: query
+        description: The partition or [start]-[end] partitions to return
+        schema:
+          type:
+            - integer
+            - array
+              items:
+                type: integer
+              minItems: 2
+              maxItems: 2
+            - string
+              pattern: '^[0-9]+-[0-9]+$'
+      - name: resource
+        in: query
+        description: The host and broker-level resource by which to sort the cruise-control response
+        schema:
+          type: string
+          enum:
+            - cpu
+            - networkinbound
+            - networkoutbound
+            - disk
+      - name: start
+        in: query
+        description: The timestamp in milliseconds since the Epoch to use as the start
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      - name: topic
+        in: query
+        description: A regular expression matching the desired topics
+        schema:
+          type: string
