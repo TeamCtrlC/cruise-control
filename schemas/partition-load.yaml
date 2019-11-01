@@ -23,12 +23,12 @@
           minimum: 1
       - name: json
         in: query
-        description: Whether cruise-control's response should be in JSON format
+        description: If true, cruise-control's response is in JSON format
         schema:
           type: boolean
       - name: max_load
         in: query
-        description: Whether to return the peak load (max load) or the average load
+        description: If true, the peak load is returned; If false, the average load is returned
         schema:
           type: boolean
       - name: min_valid_partition_ratio
@@ -43,15 +43,24 @@
         in: query
         description: The partition or [start]-[end] partitions to return
         schema:
-          type:
-            - integer
-            - array
+          oneOf:
+            - type: integer
+              example:
+                - value: 0
+                - summary: returns 0th partition
+            - type: array
               items:
                 type: integer
               minItems: 2
               maxItems: 2
-            - string
+              example:
+              - value: [0,9]
+              - summary: 0 is the start index and 9 is the end index, in collection format
+            - type: string
               pattern: '^[0-9]+-[0-9]+$'
+              example:
+              - value: '0-9'
+              - summary: 0 is the start index and 9 is the end index, in string format
       - name: resource
         in: query
         description: The host and broker-level resource by which to sort the cruise-control response
@@ -71,6 +80,6 @@
           minimum: 0
       - name: topic
         in: query
-        description: A regular expression matching the desired topics
+        description: A regular expression used to match the desired topics
         schema:
           type: string
