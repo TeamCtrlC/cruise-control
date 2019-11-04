@@ -2,262 +2,7 @@ openapi: "3.0.0"
 info:
   title: Cruise Control API
   version: 1.0.0
-components:
-  schemas:
-    OptimizationResult:
-      type: object
-      properties:
-        proposals:
-          type: array
-          items:
-            type: object
-            properties:
-              topicPartition:
-                type: string
-              oldLeader:
-                type: integer
-                format: int32
-              oldReplicas:
-                type: array
-                items:
-                  type: integer
-                  format: int32
-              newReplicas:
-                type: array
-                items:
-                  type: integer
-                  format: int32
-        loadBeforeOptimization:
-          $ref: '#/components/schemas/BrokerStats'
-        summary:
-          type: object
-          properties:
-            numReplicaMovements:
-              type: integer
-              format: int32
-            dataMoveToMB:
-              type: integer
-              format: int64
-            numIntraBrokerReplicaMovements:
-              type: integer
-              format: int32
-            intraBrokerDataToMoveMB:
-              type: integer
-              format: int64
-            numLeaderMovements:
-              type: integer
-              format: int32
-            recentWindows:
-              type: integer
-              format: int32
-            monitoredPartitionsPercentage:
-              type: number
-              format: double
-            excludedTopics:
-              type: array
-              items:
-                type: string
-            excludedBrokersForLeadership:
-              type: array
-              items:
-                type: integer
-                format: int32
-            onDemandBalancednessScoreBefore:
-              type: number
-              format: double
-            onDemandBalancednessScoreAfter:
-              type: number
-              format: double
-        goalSummary:
-          type: array
-          items:
-            type: object
-            properties:
-              goal:
-                type: string
-              status:
-                type: string
-                enum:
-                  - "VIOLATED"
-                  - "FIXED"
-                  - "NO-ACTION"
-              clusterModelStats:
-                type: object
-                properties:
-                  metadata:
-                    type: object
-                    properties:
-                      brokers:
-                        type: integer
-                        format: int32
-                      replicas:
-                        type: integer
-                        format: int32
-                      topics:
-                        type: integer
-                        format: int32
-                  statistics:
-                    type: object
-                    properties:
-                      avg:
-                        $ref: '#/components/schemas/Statistic'
-                      max:
-                        $ref: '#/components/schemas/Statistic'
-                      min:
-                        $ref: '#/components/schemas/Statistic'
-                      std:
-                        $ref: '#/components/schemas/Statistic'
-        loadAfterOptimization:
-          $ref: '#/components/schemas/BrokerStats'
-        version:
-          type: integer
-          format: int32
-    BrokerStats:
-      type: object
-      properties:
-        version:
-          type: integer
-          format: int32
-        hosts:
-          type: array
-          items:
-            type: object
-            properties:
-              host:
-                type: string
-              diskMB:
-                type: number
-                format: double
-              diskPct:
-                type: number
-                format: double
-              cpuPct:
-                type: number
-                format: double
-              leaderNwInRate:
-                type: number
-                format: double
-              followerNwInRate:
-                type: number
-                format: double
-              nwOutRate:
-                type: number
-                format: double
-              pnwOutRate:
-                type: number
-                format: double
-              replicas:
-                type: integer
-                format: int32
-              leaders:
-                type: integer
-                format: int32
-        brokers:
-          type: array
-          items:
-            type: object
-            properties:
-              host:
-                type: string
-              broker:
-                type: integer
-                format: int32
-              brokerState:
-                type: string
-                enum:
-                  - ALIVE
-                  - DEAD
-                  - NEW
-                  - DEMOTED
-                  - BAD_DISKS  
-              diskMB:
-                type: number
-                format: double
-              diskPct:
-                type: number
-                format: double
-              cpuPct:
-                type: number
-                format: double
-              leaderNwInRate:
-                type: number
-                format: double
-              followerNwInRate:
-                type: number
-                format: double
-              nwOutRate:
-                type: number
-                format: double
-              pnwOutRate:
-                type: number
-                format: double
-              replicas:
-                type: integer
-                format: int32
-              leaders:
-                type: integer
-                format: int32
-              diskState:
-                type: object
-                additionalProperties:
-                  description: Based on _diskStatsByLogDir
-                  type: object
-                  properties:
-                    diskMb:
-                      oneOf:
-                        - type: string
-                          enum:
-                            - "DEAD"
-                        - type: number
-                          format: double
-                    diskPct:
-                      oneOf:
-                        - type: string
-                          enum:
-                            - "DEAD"
-                        - type: number
-                          format: double
-                    numLeaderReplicas:
-                      type: integer
-                      format: int32
-                    numReplicas:   
-                      type: integer
-                      format: int32
-    Statistic:
-      type: object
-      properties:
-        potentialNwOut:
-          type: number
-          format: double
-        replicas:
-          type: number
-        leaderReplicas:
-          type: number
-        topicReplicas:
-          type: number 
-    ProgressResult:
-      type: object
-      properties:
-          progress:
-            type: object
-            properties:
-              operation:
-                type: string
-              operationProgress:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    step:
-                      type: string
-                    description:
-                      type: string
-                    time-in-ms:
-                      type: integer
-                      format: int64
-                    completionPercentage:
-                      type: number
-                      format: double
+
 paths:
   /kafkacruisecontrol/rebalance:
     post:
@@ -290,21 +35,21 @@ paths:
           schema: 
             type: integer
             format: int32
-            minimum: 0
+            minimum: 1
         - in: query
           name: concurrent_intra_broker_partition_movements
           description: The upper bound of ongoing replica movements between disks within each broker	
           schema: 
             type: integer
             format: int32
-            minimum: 0
+            minimum: 1
         - in: query
           name: concurrent_leader_movements
           description: The upper bound of ongoing leadership movements	
           schema: 
             type: integer
             format: int32
-            minimum: 0
+            minimum: 1
         - in: query
           name: json
           description: Whether to return in JSON format or not	
@@ -403,12 +148,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/OptimizationResult'
+                $ref: 'responses/optimzation-result.yaml#/OptimizationResult'
         '202':
           description: |-
             Rebalancing in progress
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProgressResult'
+                $ref: 'responses/progress-result.yaml#/ProgressResult'
+              
 
