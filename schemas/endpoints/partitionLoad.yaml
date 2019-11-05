@@ -1,0 +1,92 @@
+PartitionLoadEndpoint:
+  get:
+    summary: Get the resource load for each partition
+    parameters:
+      - name: allow_capacity_estimation
+        in: query
+        description: Whether to allow capacity estimation when cruise-control is unable to obtain all per-broker capacity information
+        schema:
+          type: boolean
+      - name: end
+        in: query
+        description: The timestamp in milliseconds since the Epoch to use as the end
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      - name: entries
+        in: query
+        description: The number of entries to show in the response
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+      - name: json
+        in: query
+        description: If true, cruise-control's response is in JSON format
+        schema:
+          type: boolean
+      - name: max_load
+        in: query
+        description: If true, the peak load is returned; If false, the average load is returned
+        schema:
+          type: boolean
+      - name: min_valid_partition_ratio
+        in: query
+        description: The minimum required ratio of monitored topics [0-1]
+        schema:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+      - name: partition
+        in: query
+        description: The partition or [start]-[end] partitions to return
+        schema:
+          oneOf:
+            - type: integer
+              example:
+                - value: 0
+                - summary: returns 0th partition
+            - type: array
+              items:
+                type: integer
+              minItems: 2
+              maxItems: 2
+              example:
+              - value: [0,9]
+              - summary: 0 is the start index and 9 is the end index, in collection format
+            - type: string
+              pattern: '^[0-9]+-[0-9]+$'
+              example:
+              - value: '0-9'
+              - summary: 0 is the start index and 9 is the end index, in string format
+      - name: resource
+        in: query
+        description: The host and broker-level resource by which to sort the cruise-control response
+        schema:
+          type: string
+          enum:
+            - cpu
+            - networkinbound
+            - networkoutbound
+            - disk
+      - name: start
+        in: query
+        description: The timestamp in milliseconds since the Epoch to use as the start
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      - name: topic
+        in: query
+        description: A regular expression used to match the desired topics
+        schema:
+          type: string
+    response:
+      '200':
+        content:
+            # TODO: implement response
+            application/json:
+              schema:
+                type: object
