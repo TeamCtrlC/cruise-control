@@ -22,7 +22,7 @@ OptimizationResult:
               type: integer
               format: int32
     loadBeforeOptimization:
-      $ref: '../components/broker-stats.yaml#/BrokerStats'
+      $ref: '../components/brokerStats.yaml#/BrokerStats'
     summary:
       type: object
       properties:
@@ -102,7 +102,7 @@ OptimizationResult:
                   std:
                     $ref: '../components/statistic.yaml#/Statistic'
     loadAfterOptimization:
-      $ref: '../components/broker-stats.yaml#/BrokerStats'
+      $ref: '../components/brokerStats.yaml#/BrokerStats'
     version:
       type: integer
       format: int32
