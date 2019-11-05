@@ -88,4 +88,5 @@ PartitionLoadEndpoint:
         content:
             # TODO: implement response
             application/json:
-              schema: object
+              schema:
+                type: object
