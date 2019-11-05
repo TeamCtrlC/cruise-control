@@ -1,4 +1,4 @@
-/partition_load:
+PartitionLoadEndpoint:
   get:
     summary: Get the resource load for each partition
     parameters:
@@ -83,3 +83,9 @@
         description: A regular expression used to match the desired topics
         schema:
           type: string
+    response:
+      '200':
+        content:
+            # TODO: implement response
+            application/json:
+              schema: object
