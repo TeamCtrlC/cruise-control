@@ -8,8 +8,8 @@ RebalanceEndpoint:
         schema: 
           type: boolean
           default: true
-        name: goals
-      - in: query
+      - name: goals
+        in: query
         description: list of goals used to generate proposal
         schema: 
           type: array
