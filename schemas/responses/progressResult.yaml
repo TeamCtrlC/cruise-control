@@ -1,6 +1,9 @@
 ProgressResult:
   type: object
   properties:
+    version:
+      type: integer
+      format: int32
     progress:
       type: object
       properties:
