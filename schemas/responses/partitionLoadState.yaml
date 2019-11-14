@@ -23,12 +23,17 @@ PartitionLoadState:
               type: integer
               format: int32
           cpu:
-            type: double
+            type: integer
+            format: double
           networkInbound:
-            type: double
+            type: integer
+            format: double
           networkOutbound:
-            type: double
+            type: integer
+            format: double
           disk:
-            type: double
+            type: integer
+            format: double
           msg_in:
-            type: double
+            type: integer
+            format: double
