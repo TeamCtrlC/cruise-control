@@ -1,0 +1,4 @@
+AnalyzerState:
+  nullable: true
+  type: object
+  # TODO: Add properties

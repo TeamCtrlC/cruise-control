@@ -1,0 +1,50 @@
+MonitorState:
+  nullable: true
+  type: object
+  properties:
+    state:
+      type: string
+      enum:
+        - NOT_STARTED
+        - RUNNING
+        - PAUSED
+        - SAMPLING
+        - BOOTSTRAPPING
+        - TRAINING
+        - LOADING
+    trained:
+      type: boolean
+    trainingPct:
+      type: number
+      format: double
+    numMonitoredWindows:
+      type: number
+    monitoredWindows:
+      nullable: true
+      type: object
+      additionalProperties:
+        type: number
+        format: double
+    numValidPartitions:
+      type: number
+    numTotalPartitions:
+      type: number
+    monitoringCoveragePct:
+      type: number
+      format: double
+    numFlawedPartitions:
+      type: number
+    reasonOfLatestPauseOrResume:
+      nullable: true
+      type: string
+    bootstrapProgressPct:
+      nullable: true
+      type: number
+      format: double
+    loadingProgressPct:
+      nullable: true
+      type: number
+      format: double
+    error:
+      nullable: true
+      type: string
