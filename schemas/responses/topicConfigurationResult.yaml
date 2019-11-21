@@ -3,7 +3,8 @@ TopicConfigurationResult:
   properties:
     topics:
       type: array
-      items: string
+      items:
+        type: string
     newReplicationFactor:
       type: integer
       format: int32

@@ -98,7 +98,7 @@ TopicConfigurationEndpoint:
         content:
           application/json:
             schema:
-              $ref: '../responses/topicConfigurationnResult.yaml#/TopicConfigurationResult'
+              $ref: '../responses/topicConfigurationResult.yaml#/TopicConfigurationResult'
       '202':
         description: |-
           Partition load state fetch in progress
