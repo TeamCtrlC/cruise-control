@@ -1,4 +1,32 @@
 AnalyzerState:
   nullable: true
   type: object
-  # TODO: Add properties
+  properties:
+    isProposalReady:
+      type: boolean
+    readyGoals:
+      type: array
+      items:
+        type: string
+    goalReadiness:
+      nullable: true
+      type: array
+      items:
+        type: object
+        properties:
+          name:
+            type: string
+          modelCompleteRequirement:
+            type: object
+            properties:
+              requiredNumSnapshots:
+                type: number
+              minMonitoredPartitionsPercentage:
+                type: number
+              includeAllTopics:
+                type: boolean
+          status:
+            type: string
+            enum:
+              - ready
+              - notReady
