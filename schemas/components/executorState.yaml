@@ -136,3 +136,81 @@ ExecutorState:
       type: array
       items:
         $ref: '#/ExecutionTask'
+    maximumConcurrentIntraBrokerPartitionMovementsPerBroker:
+      nullable: true
+      type: number
+    numInProgressIntraBrokerPartitionMovements:
+      nullable: true
+      type: number
+    numAbortingIntraBrokerPartitionMovements:
+      nullable: true
+      type: number
+    numPendingIntraBrokerPartitionMovements:
+      nullable: true
+      type: number
+    finishedIntraBrokerDataMovement:
+      nullable: true
+      type: number
+    numTotalIntraBrokerPartitionMovements:
+      nullable: true
+      type: number
+    totalIntraBrokerDataToMove:
+      nullable: true
+      type: number
+    inProgressIntraBrokerPartitionMovement:
+      nullable: true
+      type: array
+      items:
+        $ref: '#/ExecutionTask'
+    pendingIntraBrokerPartitionMovement:
+      nullable: true
+      type: array
+      items:
+        $ref: '#/ExecutionTask'
+    abortingIntraBrokerPartitionMovement:
+      nullable: true
+      type: array
+      items:
+        $ref: '#/ExecutionTask'
+    abortedIntraBrokerPartitionMovement:
+      nullable: true
+      type: array
+      items:
+        $ref: '#/ExecutionTask'
+    deadIntraBrokerPartitionMovement:
+      nullable: true
+      type: array
+      items:
+        $ref: '#/ExecutionTask'
+    completedIntraBrokerPartitionMovement:
+      nullable: true
+      type: array
+      items:
+        $ref: '#/ExecutionTask'
+    numCancelledLeadershipMovements:
+      nullable: true
+      type: number
+    numCancelledPartitionMovements:
+      nullable: true
+      type: number
+    numCancelledIntraBrokerPartitionMovements:
+      nullable: true
+      type: number
+    cancelledLeadershipMovement:
+      nullable: true
+      type: array
+      items:
+        $ref: '#/ExecutionTask'
+    cancelledPartitionMovement:
+      nullable: true
+      type: array
+      items:
+        $ref: '#/ExecutionTask'
+    cancelledIntraBrokerPartitionMovement:
+      nullable: true
+      type: array
+      items:
+        $ref: '#/ExecutionTask'
+    error:
+      nullable: true
+      type: string
