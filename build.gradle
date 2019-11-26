@@ -201,6 +201,7 @@ project(':cruise-control') {
     compile 'com.google.code.gson:gson:2.8.5'
     compile 'org.eclipse.jetty:jetty-server:9.4.18.v20190429'
     compile 'io.dropwizard.metrics:metrics-core:3.2.6'
+    compile group: 'io.swagger.parser.v3', name: 'swagger-parser', version: '2.0.15'
 
     testCompile project(path: ':cruise-control-metrics-reporter', configuration: 'testOutput')
     testCompile project(path: ':cruise-control-core', configuration: 'testOutput')
