@@ -44,6 +44,10 @@ public abstract class AbstractParameters implements CruiseControlParameters {
   protected boolean _json = false;
   protected EndPoint _endPoint = null;
 
+  public static SortedSet<String> getCaseInsensitiveParameterNames() {
+    return CASE_INSENSITIVE_PARAMETER_NAMES;
+  }
+
   public AbstractParameters() {
 
   }
