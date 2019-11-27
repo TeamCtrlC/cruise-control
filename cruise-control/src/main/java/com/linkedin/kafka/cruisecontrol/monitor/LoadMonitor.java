@@ -668,7 +668,7 @@ public class LoadMonitor {
     try {
       metricSampleAggregationResult = _partitionMetricSampleAggregator.aggregate(clusterAndGeneration,
                                                                                  System.currentTimeMillis(),
-                                                                                 new OperationProgress());
+                                                                                 new OperationProgress(""));
     } catch (NotEnoughValidWindowsException e) {
       return 0.0;
     }
