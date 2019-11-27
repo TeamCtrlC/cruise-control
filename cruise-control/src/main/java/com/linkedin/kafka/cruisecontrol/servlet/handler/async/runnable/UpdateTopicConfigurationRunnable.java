@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
 import static com.linkedin.kafka.cruisecontrol.KafkaCruiseControlUtils.goalsByPriority;
 import static com.linkedin.kafka.cruisecontrol.KafkaCruiseControlUtils.sanityCheckCapacityEstimation;
 import static com.linkedin.kafka.cruisecontrol.KafkaCruiseControlUtils.sanityCheckGoals;
+import static com.linkedin.kafka.cruisecontrol.KafkaCruiseControlUtils.sanityCheckLoadMonitorReadiness;
 import static com.linkedin.kafka.cruisecontrol.servlet.handler.async.runnable.RunnableUtils.populateRackInfoForReplicationFactorChange;
 import static com.linkedin.kafka.cruisecontrol.servlet.handler.async.runnable.RunnableUtils.partitionWithOfflineReplicas;
 import static com.linkedin.kafka.cruisecontrol.servlet.handler.async.runnable.RunnableUtils.topicsForReplicationFactorChange;
@@ -75,7 +76,8 @@ public class UpdateTopicConfigurationRunnable extends OperationRunnable {
                                        _topicReplicationFactorChangeParameters.replicationThrottle(),
                                        _topicReplicationFactorChangeParameters.excludeRecentlyDemotedBrokers(),
                                        _topicReplicationFactorChangeParameters.excludeRecentlyRemovedBrokers(),
-                                       _topicReplicationFactorChangeParameters.dryRun()),
+                                       _topicReplicationFactorChangeParameters.dryRun(),
+                                       _topicReplicationFactorChangeParameters.reason()),
           _kafkaCruiseControl.config());
     }
     // Never reaches here.
@@ -127,6 +129,7 @@ public class UpdateTopicConfigurationRunnable extends OperationRunnable {
    * @param excludeRecentlyDemotedBrokers Exclude recently demoted brokers from proposal generation for leadership transfer.
    * @param excludeRecentlyRemovedBrokers Exclude recently removed brokers from proposal generation for replica transfer.
    * @param dryRun Whether it is a dry run or not.
+   * @param reason Reason of execution.
    *
    * @return The optimization result.
    * @throws KafkaCruiseControlException When any exception occurred during the topic configuration updating.
@@ -144,7 +147,8 @@ public class UpdateTopicConfigurationRunnable extends OperationRunnable {
                                                       Long replicationThrottle,
                                                       boolean excludeRecentlyDemotedBrokers,
                                                       boolean excludeRecentlyRemovedBrokers,
-                                                      boolean dryRun)
+                                                      boolean dryRun,
+                                                      String reason)
       throws KafkaCruiseControlException {
     _kafkaCruiseControl.sanityCheckDryRun(dryRun);
     sanityCheckGoals(goals, skipHardGoalCheck, _kafkaCruiseControl.config());
@@ -169,6 +173,7 @@ public class UpdateTopicConfigurationRunnable extends OperationRunnable {
     Map<String, List<Integer>> brokersByRack = new HashMap<>();
     Map<Integer, String> rackByBroker = new HashMap<>();
     ModelCompletenessRequirements completenessRequirements = _kafkaCruiseControl.modelCompletenessRequirements(goalsByPriority).weaker(requirements);
+    sanityCheckLoadMonitorReadiness(completenessRequirements, _kafkaCruiseControl.getLoadMonitorTaskRunnerState());
     OperationProgress operationProgress = _future.operationProgress();
     try (AutoCloseable ignored = _kafkaCruiseControl.acquireForModelGeneration(operationProgress)) {
       ExecutorState executorState = _kafkaCruiseControl.executorState();
@@ -204,7 +209,7 @@ public class UpdateTopicConfigurationRunnable extends OperationRunnable {
       if (!dryRun) {
         _kafkaCruiseControl.executeProposals(result.goalProposals(), Collections.emptySet(), false, concurrentInterBrokerPartitionMovements,
                                              0, concurrentLeaderMovements, executionProgressCheckIntervalMs,
-                                             replicaMovementStrategy, replicationThrottle, _uuid);
+                                             replicaMovementStrategy, replicationThrottle, true, _uuid, reason);
       }
     } catch (KafkaCruiseControlException kcce) {
       throw kcce;

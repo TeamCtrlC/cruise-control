@@ -73,11 +73,11 @@ public class BrokerFailureDetectorTest extends CCKafkaIntegrationTestHarness {
                    brokerFailures.failedBrokers());
 
       // Ensure that broker failure is detected as long as the broker is down.
-      detector.detectBrokerFailures();
+      detector.detectBrokerFailures(false);
       assertEquals("One broker failure should have been detected before timeout.", 1, anomalies.size());
       // Bring the broker back
       restartDeadBroker(brokerId);
-      detector.detectBrokerFailures();
+      detector.detectBrokerFailures(true);
       assertTrue(detector.failedBrokers().isEmpty());
     } finally {
       detector.shutdown();
@@ -137,8 +137,10 @@ public class BrokerFailureDetectorTest extends CCKafkaIntegrationTestHarness {
     props.setProperty(KafkaCruiseControlConfig.ZOOKEEPER_SECURITY_ENABLED_CONFIG, "false");
     KafkaCruiseControlConfig kafkaCruiseControlConfig = new KafkaCruiseControlConfig(props);
     EasyMock.expect(mockKafkaCruiseControl.config()).andReturn(kafkaCruiseControlConfig).atLeastOnce();
+    EasyMock.expect(mockKafkaCruiseControl.loadMonitor()).andReturn(mockLoadMonitor).atLeastOnce();
+    EasyMock.expect(mockKafkaCruiseControl.timeMs()).andReturn(time.milliseconds()).atLeastOnce();
     EasyMock.replay(mockKafkaCruiseControl);
-    return new BrokerFailureDetector(mockLoadMonitor, anomalies, time, mockKafkaCruiseControl);
+    return new BrokerFailureDetector(anomalies, mockKafkaCruiseControl);
   }
 
   private void killBroker(int index) throws Exception {

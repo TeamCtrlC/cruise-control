@@ -33,6 +33,7 @@ import com.linkedin.kafka.cruisecontrol.monitor.ModelCompletenessRequirements;
 import com.linkedin.kafka.cruisecontrol.monitor.LoadMonitor;
 import com.linkedin.kafka.cruisecontrol.monitor.MonitorUtils;
 import com.linkedin.kafka.cruisecontrol.monitor.metricdefinition.KafkaMetricDef;
+import com.linkedin.kafka.cruisecontrol.monitor.task.LoadMonitorTaskRunner;
 import com.linkedin.kafka.cruisecontrol.servlet.UserTaskManager;
 import com.linkedin.kafka.cruisecontrol.servlet.response.stats.BrokerStats;
 import java.io.InputStream;
@@ -98,17 +99,23 @@ public class KafkaCruiseControl {
     ModelParameters.init(config);
 
     // Instantiate the components.
-    _loadMonitor = new LoadMonitor(config, _time, dropwizardMetricRegistry, KafkaMetricDef.commonMetricDef());
-    _goalOptimizerExecutor =
-        Executors.newSingleThreadExecutor(new KafkaCruiseControlThreadFactory("GoalOptimizerExecutor", true, null));
+    _anomalyDetector = new AnomalyDetector(this, _time, dropwizardMetricRegistry);
     long demotionHistoryRetentionTimeMs = config.getLong(KafkaCruiseControlConfig.DEMOTION_HISTORY_RETENTION_TIME_MS_CONFIG);
     long removalHistoryRetentionTimeMs = config.getLong(KafkaCruiseControlConfig.REMOVAL_HISTORY_RETENTION_TIME_MS_CONFIG);
-    _anomalyDetector = new AnomalyDetector(_loadMonitor, this, _time, dropwizardMetricRegistry);
     _executor = new Executor(config, _time, dropwizardMetricRegistry, demotionHistoryRetentionTimeMs,
                              removalHistoryRetentionTimeMs, _anomalyDetector);
+    _loadMonitor = new LoadMonitor(config, _time, _executor, dropwizardMetricRegistry, KafkaMetricDef.commonMetricDef());
+    _goalOptimizerExecutor =
+        Executors.newSingleThreadExecutor(new KafkaCruiseControlThreadFactory("GoalOptimizerExecutor", true, null));
     _goalOptimizer = new GoalOptimizer(config, _loadMonitor, _time, dropwizardMetricRegistry, _executor);
   }
 
+  /**
+   * @return The load monitor.
+   */
+  public LoadMonitor loadMonitor() {
+    return _loadMonitor;
+  }
   /**
    * Refresh the cluster metadata and get the corresponding cluster and generation information.
    *
@@ -119,8 +126,17 @@ public class KafkaCruiseControl {
   }
 
   /**
+   * @return The state of load monitor's task runner.
+   */
+  public LoadMonitorTaskRunner.LoadMonitorTaskRunnerState getLoadMonitorTaskRunnerState() {
+    return _loadMonitor.taskRunnerState();
+  }
+
+  /**
    * Acquire the semaphore for the cluster model generation.
+   *
    * @param operationProgress the progress for the job.
+   * @return A new auto closeable semaphore for the cluster model generation.
    */
   public LoadMonitor.AutoCloseableSemaphore acquireForModelGeneration(OperationProgress operationProgress)
       throws InterruptedException {
@@ -145,6 +161,9 @@ public class KafkaCruiseControl {
     LOG.info("Kafka Cruise Control started.");
   }
 
+  /**
+   * Shutdown Cruise Control.
+   */
   public void shutdown() {
     Thread t = new Thread() {
       @Override
@@ -207,7 +226,7 @@ public class KafkaCruiseControl {
    * Get the cluster model cutting off at the current timestamp.
    * @param requirements the model completeness requirements.
    * @param operationProgress the progress of the job to report.
-   * @return the cluster workload model.
+   * @return The cluster workload model.
    * @throws NotEnoughValidWindowsException If there is not enough sample to generate cluster model.
    */
   public ClusterModel clusterModel(ModelCompletenessRequirements requirements, OperationProgress operationProgress)
@@ -222,7 +241,7 @@ public class KafkaCruiseControl {
    * @param requirements the load completeness requirements.
    * @param populateReplicaPlacementInfo whether populate replica placement information.
    * @param operationProgress the progress of the job to report.
-   * @return the cluster workload model.
+   * @return The cluster workload model.
    * @throws NotEnoughValidWindowsException If there is not enough sample to generate cluster model.
    */
   public ClusterModel clusterModel(long from,
@@ -427,6 +446,7 @@ public class KafkaCruiseControl {
 
   /**
    * See {@link GoalOptimizer#optimizations(ClusterModel, List, OperationProgress, Map, OptimizationOptions)}.
+   * @return Results of optimization containing the proposals and stats.
    */
   public synchronized OptimizerResult optimizations(ClusterModel clusterModel,
                                                     List<Goal> goalsByPriority,
@@ -439,11 +459,15 @@ public class KafkaCruiseControl {
 
   /**
    * See {@link GoalOptimizer#excludedTopics(ClusterModel, Pattern)}.
+   * @return Set of excluded topics in the given cluster model.
    */
   public Set<String> excludedTopics(ClusterModel clusterModel, Pattern requestedExcludedTopics) {
     return _goalOptimizer.excludedTopics(clusterModel, requestedExcludedTopics);
   }
 
+  /**
+   * @return Kafka Cruise Control config.
+   */
   public KafkaCruiseControlConfig config() {
     return _config;
   }
@@ -473,7 +497,9 @@ public class KafkaCruiseControl {
    *                                (if null, use default.replica.movement.strategies).
    * @param replicationThrottle The replication throttle (bytes/second) to apply to both leaders and followers
    *                            when executing proposals (if null, no throttling is applied).
+   * @param isTriggeredByUserRequest Whether the execution is triggered by a user request.
    * @param uuid UUID of the execution.
+   * @param reason Reason of the execution.
    */
   public void executeProposals(Set<ExecutionProposal> proposals,
                                Set<Integer> unthrottledBrokers,
@@ -484,14 +510,16 @@ public class KafkaCruiseControl {
                                Long executionProgressCheckIntervalMs,
                                ReplicaMovementStrategy replicaMovementStrategy,
                                Long replicationThrottle,
-                               String uuid) {
+                               boolean isTriggeredByUserRequest,
+                               String uuid,
+                               String reason) {
     if (hasProposalsToExecute(proposals, uuid)) {
       // Set the execution mode, add execution proposals, and start execution.
       _executor.setExecutionMode(isKafkaAssignerMode);
       _executor.executeProposals(proposals, unthrottledBrokers, null, _loadMonitor,
                                  concurrentInterBrokerPartitionMovements, concurrentIntraBrokerPartitionMovements,
                                  concurrentLeaderMovements, executionProgressCheckIntervalMs, replicaMovementStrategy,
-                                 replicationThrottle, uuid);
+                                 replicationThrottle, isTriggeredByUserRequest, uuid, reason);
     }
   }
 
@@ -511,7 +539,9 @@ public class KafkaCruiseControl {
    *                                (if null, use default.replica.movement.strategies).
    * @param replicationThrottle The replication throttle (bytes/second) to apply to both leaders and followers
    *                            when executing remove operations (if null, no throttling is applied).
+   * @param isTriggeredByUserRequest Whether the execution is triggered by a user request.
    * @param uuid UUID of the execution.
+   * @param reason Reason of the execution.
    */
   public void executeRemoval(Set<ExecutionProposal> proposals,
                              boolean throttleDecommissionedBroker,
@@ -522,14 +552,16 @@ public class KafkaCruiseControl {
                              Long executionProgressCheckIntervalMs,
                              ReplicaMovementStrategy replicaMovementStrategy,
                              Long replicationThrottle,
-                             String uuid) {
+                             boolean isTriggeredByUserRequest,
+                             String uuid,
+                             String reason) {
     if (hasProposalsToExecute(proposals, uuid)) {
       // Set the execution mode, add execution proposals, and start execution.
       _executor.setExecutionMode(isKafkaAssignerMode);
       _executor.executeProposals(proposals, throttleDecommissionedBroker ? Collections.emptySet() : removedBrokers,
                                  removedBrokers, _loadMonitor, concurrentInterBrokerPartitionMovements, 0,
                                  concurrentLeaderMovements, executionProgressCheckIntervalMs, replicaMovementStrategy,
-                                 replicationThrottle, uuid);
+                                 replicationThrottle, isTriggeredByUserRequest, uuid, reason);
     }
   }
 
@@ -546,7 +578,9 @@ public class KafkaCruiseControl {
    *                                (if null, use default.replica.movement.strategies).
    * @param replicationThrottle The replication throttle (bytes/second) to apply to both leaders and followers
    *                            when executing demote operations (if null, no throttling is applied).
+   * @param isTriggeredByUserRequest Whether the execution is triggered by a user request.
    * @param uuid UUID of the execution.
+   * @param reason Reason of the execution.
    */
   public void executeDemotion(Set<ExecutionProposal> proposals,
                               Set<Integer> demotedBrokers,
@@ -555,7 +589,9 @@ public class KafkaCruiseControl {
                               Long executionProgressCheckIntervalMs,
                               ReplicaMovementStrategy replicaMovementStrategy,
                               Long replicationThrottle,
-                              String uuid) {
+                              boolean isTriggeredByUserRequest,
+                              String uuid,
+                              String reason) {
     if (hasProposalsToExecute(proposals, uuid)) {
       // (1) Kafka Assigner mode is irrelevant for demoting.
       // (2) Ensure that replica swaps within partitions, which are prerequisites for broker demotion and does not trigger data move,
@@ -568,17 +604,23 @@ public class KafkaCruiseControl {
       // Set the execution mode, add execution proposals, and start execution.
       _executor.setExecutionMode(false);
       _executor.executeDemoteProposals(proposals, demotedBrokers, _loadMonitor, concurrentSwaps, concurrentLeaderMovements,
-                                       executionProgressCheckIntervalMs, replicaMovementStrategy, replicationThrottle, uuid);
+                                       executionProgressCheckIntervalMs, replicaMovementStrategy, replicationThrottle,
+                                       isTriggeredByUserRequest, uuid, reason);
     }
   }
 
   /**
    * Request the executor to stop any ongoing execution.
+   *
+   * @param forceExecutionStop Whether force execution to stop.
    */
-  public void userTriggeredStopExecution() {
-    _executor.userTriggeredStopExecution();
+  public void userTriggeredStopExecution(boolean forceExecutionStop) {
+    _executor.userTriggeredStopExecution(forceExecutionStop);
   }
 
+  /**
+   * @return The current state of the executor.
+   */
   public ExecutorState.State executionState() {
     return executorState().state();
   }
@@ -620,36 +662,43 @@ public class KafkaCruiseControl {
   }
 
   /**
-   * Get the cluster information from Kafka metadata.
+   * @return The cluster information from Kafka metadata.
    */
   public Cluster kafkaCluster() {
     return _loadMonitor.kafkaCluster();
   }
 
   /**
-   * Get the topic config provider.
+   * @return The topic config provider.
    */
   public TopicConfigProvider topicConfigProvider() {
     return _loadMonitor.topicConfigProvider();
   }
 
   /**
-   * Get the Kafka Cruise Control Version
+   * @return The Kafka Cruise Control Version
    */
   public static String cruiseControlVersion() {
     return VERSION;
   }
 
   /**
-   * Get the Kafka Cruise Control's current code's commit id
+   * @return The Kafka Cruise Control's current code's commit id
    */
   public static String cruiseControlCommitId() {
     return COMMIT_ID;
   }
 
-  public ModelCompletenessRequirements modelCompletenessRequirements(Collection<Goal> overrides) {
-    return overrides == null || overrides.isEmpty() ?
-           _goalOptimizer.defaultModelCompletenessRequirements() : MonitorUtils.combineLoadRequirementOptions(overrides);
+  /**
+   * If the goals is empty or null, return the default model completeness requirements, otherwise combine the load
+   * requirement options for the given goals and return the resulting model completeness requirements.
+   *
+   * @param goals Goals to combine load requirement options.
+   * @return Model completeness requirements.
+   */
+  public ModelCompletenessRequirements modelCompletenessRequirements(Collection<Goal> goals) {
+    return goals == null || goals.isEmpty() ?
+           _goalOptimizer.defaultModelCompletenessRequirements() : MonitorUtils.combineLoadRequirementOptions(goals);
   }
 
   /**

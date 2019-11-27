@@ -113,6 +113,10 @@ The following configurations are inherited from the open source Kafka client con
 |demotion.history.retention.time.ms	 | Long	 | N	 | 1209600000	 | The maximum time in milliseconds to retain the demotion history of brokers.	 |
 |removal.history.retention.time.ms	 | Long	 | N	 | 1209600000	 | The maximum time in milliseconds to retain the removal history of brokers.	 |
 |logdir.response.timeout.ms	 | Long	 | N	 | 10000	 | Timeout in ms for broker logdir to respond	 |
+|leader.movement.timeout.ms	 | Long	 | N	 | 180000	 | The maximum time to wait for a leader movement to finish. A leader movement will be marked as failed if it takes longer than this time to finish.	 |
+|task.execution.alerting.threshold.ms	 | Long	 | N	 | 90000	 | Threshold of execution time to alert a replica/leader movement task. If the task's execution time exceeds this threshold and the data movement rate is lower than the threshold set for inter-broker/intra-broker replica, alert will be sent out by notifier set via executor.notifier.class.|
+|inter.broker.replica.movement.rate.alerting.threshold	 | Double	 | N	 | 0.1	 | Threshold of data movement rate(in MB/s) for inter-broker replica movement task. If the task's data movement rate is lower than this and the task's execution time exceeds the threshold set via task.execution.alerting.threshold.ms, alert will be sent out by notifier set via executor.notifier.class.|
+|intra.broker.replica.movement.rate.alerting.threshold	 | Double	 | N	 | 0.2	 | Threshold of data movement rate(in MB/s) for intra-broker replica movement task. If the task's data movement rate is lower than this and the task's execution time exceeds the threshold set via task.execution.alerting.threshold.ms, alert will be sent out by notifier set via executor.notifier.class.|
 
 ### AnomalyDetector Configurations
 | Name                                              | Type   | Required? | Default Value            | Description                                                                                                                                                                                                                                            |
@@ -162,6 +166,7 @@ The following configurations are inherited from the open source Kafka client con
 |two.step.verification.enabled	 | Boolean	 | N	 | false	 | Enable two-step verification for processing POST requests.	 |
 |two.step.purgatory.retention.time.ms	 | Long	 | N	 | 1209600000	 | The maximum time in milliseconds to retain the requests in two-step (verification) purgatory.	 |
 |two.step.purgatory.max.requests	 | Int	 | N	 | 25	 | The maximum number of requests in two-step (verification) purgatory.	 |
+|request.reason.required	 | Boolean	 | N	 | false	 | Require specifying reason via for non-dryrun rebalance/add_broker/remove_broker/demote_broker/fix_offline_replicas/topic_configuration request.	 |
 
 ### Configurations under development and testing
 We are still trying to improve cruise control. And following are some configurations that are for development and experiment.

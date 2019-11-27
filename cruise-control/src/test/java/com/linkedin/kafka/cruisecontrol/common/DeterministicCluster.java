@@ -36,9 +36,45 @@ public class DeterministicCluster {
 
   }
 
-  // Two racks, three brokers, two partitions, two replicas, leaders are in index-1 (not in index-0).
+  /**
+   * Two brokers on two racks, each has two disks.
+   * One topic with eight partitions, each has one replica.
+   *
+   * @return Cluster model for the tests.
+   */
+  public static ClusterModel unbalanced4() {
+    Map<Integer, Integer> rackByBrokerId = new HashMap<>(2);
+    rackByBrokerId.put(0, 0);
+    rackByBrokerId.put(1, 1);
+    ClusterModel cluster = getHomogeneousCluster(rackByBrokerId, TestConstants.BROKER_CAPACITY, TestConstants.DISK_CAPACITY);
+
+    for (int i = 0; i < 8; i++) {
+      // Create topic partitions.
+      TopicPartition pInfo = new TopicPartition(T1, i);
+
+      // Create replicas for topic partitions.
+      int brokerId = i > 3 ? 1 : 0;
+      String logdir = i % 4 < 2 ? TestConstants.LOGDIR0 : TestConstants.LOGDIR1;
+      cluster.createReplica(rackByBrokerId.get(brokerId).toString(), brokerId, pInfo, 0, true, false, logdir, false);
+
+      // Create snapshots for replicas.
+      AggregatedMetricValues aggregatedMetricValues = getAggregatedMetricValues(
+          TestConstants.TYPICAL_CPU_CAPACITY / 5 + TestConstants.TYPICAL_CPU_CAPACITY / 50 * (i / 2.0 - 1.5),
+          TestConstants.LARGE_BROKER_CAPACITY / 5 + TestConstants.LARGE_BROKER_CAPACITY / 50 * (i / 2.0 - 1.5),
+          TestConstants.MEDIUM_BROKER_CAPACITY / 5 + TestConstants.MEDIUM_BROKER_CAPACITY / 50 * (i / 2.0 - 1.5),
+          TestConstants.LARGE_BROKER_CAPACITY / 5 + TestConstants.LARGE_BROKER_CAPACITY / 50 * (i / 2.0 - 1.5));
+      cluster.setReplicaLoad(rackByBrokerId.get(brokerId).toString(), brokerId, pInfo, aggregatedMetricValues, Collections.singletonList(1L));
+    }
+    return cluster;
+  }
+
+  /**
+   * Two racks, three brokers, two partitions, two replicas, leaders are in index-1 (not in index-0).
+   *
+   * @return Cluster model for the tests.
+   */
   public static ClusterModel unbalanced3() {
-    ClusterModel cluster = getHomogeneousCluster(RACK_BY_BROKER, TestConstants.BROKER_CAPACITY);
+    ClusterModel cluster = getHomogeneousCluster(RACK_BY_BROKER, TestConstants.BROKER_CAPACITY, null);
 
     // Create topic partition.
     TopicPartition pInfoT10 = new TopicPartition(T1, 0);
@@ -65,7 +101,11 @@ public class DeterministicCluster {
     return cluster;
   }
 
-  // Two racks, three brokers, six partitions, one replica.
+  /**
+   * Two racks, three brokers, six partitions, one replica.
+   *
+   * @return Cluster model for the tests.
+   */
   public static ClusterModel unbalanced2() {
 
     ClusterModel cluster = unbalanced();
@@ -94,9 +134,13 @@ public class DeterministicCluster {
     return cluster;
   }
 
-  // Two racks, three brokers, two partitions, one replica.
+  /**
+   * Two racks, three brokers, two partitions, one replica.
+   *
+   * @return Cluster model for the tests.
+   */
   public static ClusterModel unbalanced() {
-    ClusterModel cluster = getHomogeneousCluster(RACK_BY_BROKER, TestConstants.BROKER_CAPACITY);
+    ClusterModel cluster = getHomogeneousCluster(RACK_BY_BROKER, TestConstants.BROKER_CAPACITY, null);
 
     // Create topic partition.
     TopicPartition pInfoT10 = new TopicPartition(T1, 0);
@@ -119,9 +163,13 @@ public class DeterministicCluster {
     return cluster;
   }
 
-  // Two racks, three brokers, one partition, two replicas
+  /**
+   * Two racks, three brokers, one partition, two replicas
+   *
+   * @return Cluster model for the tests.
+   */
   public static ClusterModel rackAwareSatisfiable() {
-    ClusterModel cluster = getHomogeneousCluster(RACK_BY_BROKER, TestConstants.BROKER_CAPACITY);
+    ClusterModel cluster = getHomogeneousCluster(RACK_BY_BROKER, TestConstants.BROKER_CAPACITY, null);
 
     // Create topic partition.
     TopicPartition pInfoT10 = new TopicPartition(T1, 0);
@@ -142,7 +190,11 @@ public class DeterministicCluster {
     return cluster;
   }
 
-  // two racks, three brokers, one partition, three replicas.
+  /**
+   * Two racks, three brokers, one partition, three replicas.
+   *
+   * @return Cluster model for the tests.
+   */
   public static ClusterModel rackAwareUnsatisfiable() {
     ClusterModel cluster = rackAwareSatisfiable();
     TopicPartition pInfoT10 = new TopicPartition(T1, 0);
@@ -246,7 +298,7 @@ public class DeterministicCluster {
    * @return Small scale cluster.
    */
   public static ClusterModel smallClusterModel(Map<Resource, Double> brokerCapacity) {
-    ClusterModel cluster = getHomogeneousCluster(RACK_BY_BROKER, brokerCapacity);
+    ClusterModel cluster = getHomogeneousCluster(RACK_BY_BROKER, brokerCapacity, null);
 
     // Create topic partition.
     TopicPartition pInfoT10 = new TopicPartition(T1, 0);
@@ -301,7 +353,7 @@ public class DeterministicCluster {
     racksByBrokerIds.put(2, 2);
     racksByBrokerIds.put(3, 3);
     racksByBrokerIds.put(4, 4);
-    ClusterModel cluster = getHomogeneousCluster(racksByBrokerIds, brokerCapacity);
+    ClusterModel cluster = getHomogeneousCluster(racksByBrokerIds, brokerCapacity, null);
 
     // Create topic partitions.
     TopicPartition pInfoT10 = new TopicPartition(T1, 0);
@@ -367,7 +419,7 @@ public class DeterministicCluster {
    * @return A medium test cluster.
    */
   public static ClusterModel mediumClusterModel(Map<Resource, Double> brokerCapacity) {
-    ClusterModel cluster = getHomogeneousCluster(RACK_BY_BROKER, brokerCapacity);
+    ClusterModel cluster = getHomogeneousCluster(RACK_BY_BROKER, brokerCapacity, null);
     // Create topic partition.
     TopicPartition pInfoA0 = new TopicPartition("A", 0);
     TopicPartition pInfoA1 = new TopicPartition("A", 1);
@@ -420,9 +472,12 @@ public class DeterministicCluster {
    *
    * @param rackByBroker Racks by broker ids.
    * @param brokerCapacity Alive broker capacity.
+   * @param diskCapacityByLogDir Disk capacity for each broker.
    * @return Cluster with the specified number of racks and broker distribution.
    */
-  public static ClusterModel getHomogeneousCluster(Map<Integer, Integer> rackByBroker, Map<Resource, Double> brokerCapacity) {
+  public static ClusterModel getHomogeneousCluster(Map<Integer, Integer> rackByBroker,
+                                                   Map<Resource, Double> brokerCapacity,
+                                                   Map<String, Double> diskCapacityByLogDir) {
     // Sanity checks.
     if (rackByBroker.size() <= 0 ||
         brokerCapacity.get(Resource.CPU) < 0 ||
@@ -442,10 +497,10 @@ public class DeterministicCluster {
       }
     }
 
-    BrokerCapacityInfo commonBrokerCapacityInfo = new BrokerCapacityInfo(brokerCapacity);
+    BrokerCapacityInfo commonBrokerCapacityInfo = new BrokerCapacityInfo(brokerCapacity, diskCapacityByLogDir);
     // Create brokers and assign a broker to each rack.
     rackByBroker.forEach(
-        (key, value) -> cluster.createBroker(value.toString(), Integer.toString(key), key, commonBrokerCapacityInfo, false));
+        (key, value) -> cluster.createBroker(value.toString(), Integer.toString(key), key, commonBrokerCapacityInfo, diskCapacityByLogDir != null));
     return cluster;
   }
 }

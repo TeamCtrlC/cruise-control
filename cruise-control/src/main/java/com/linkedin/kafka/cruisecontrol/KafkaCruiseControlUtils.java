@@ -7,6 +7,8 @@ package com.linkedin.kafka.cruisecontrol;
 import com.linkedin.kafka.cruisecontrol.analyzer.AnalyzerUtils;
 import com.linkedin.kafka.cruisecontrol.analyzer.goals.PreferredLeaderElectionGoal;
 import com.linkedin.kafka.cruisecontrol.config.KafkaCruiseControlConfig;
+import com.linkedin.kafka.cruisecontrol.monitor.ModelCompletenessRequirements;
+import com.linkedin.kafka.cruisecontrol.monitor.task.LoadMonitorTaskRunner;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Collection;
@@ -24,13 +26,19 @@ import org.apache.kafka.clients.admin.DescribeLogDirsResult;
 import java.util.TimeZone;
 import java.util.stream.Collectors;
 import org.apache.kafka.common.Cluster;
+import org.apache.kafka.common.Node;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.config.SslConfigs;
 import org.apache.kafka.common.config.SaslConfigs;
+import org.apache.kafka.common.message.MetadataResponseData;
+import org.apache.kafka.common.record.RecordBatch;
+import org.apache.kafka.common.requests.AbstractResponse;
+import org.apache.kafka.common.requests.MetadataResponse;
 import org.apache.kafka.common.security.auth.SecurityProtocol;
 import org.apache.kafka.common.utils.SystemTime;
+import scala.Option;
 
 import static com.linkedin.kafka.cruisecontrol.servlet.parameters.ParameterUtils.SKIP_HARD_GOAL_CHECK_PARAM;
 
@@ -52,15 +60,24 @@ public class KafkaCruiseControlUtils {
   private static final int HOUR_TO_MS = MIN_TO_MS * 60;
   private static final int DAY_TO_MS = HOUR_TO_MS * 24;
   public static final String OPERATION_LOGGER = "operationLogger";
+  // This will make MetaData.update() trigger a real metadata fetch.
+  public static final int REQUEST_VERSION_UPDATE = -1;
 
   private KafkaCruiseControlUtils() {
 
   }
 
+  /**
+   * @return The current UTC date.
+   */
   public static String currentUtcDate() {
     return utcDateFor(System.currentTimeMillis());
   }
 
+  /**
+   * @param timeMs Time in milliseconds.
+   * @return The date for the given time in {@link #TIME_ZONE}.
+   */
   public static String utcDateFor(long timeMs) {
     Date date = new Date(timeMs);
     DateFormat formatter = new SimpleDateFormat(DATE_FORMAT);
@@ -69,7 +86,7 @@ public class KafkaCruiseControlUtils {
   }
 
   /**
-   * Format the timestamp from long to a human readable string.
+   * @return Formatted timestamp from long to a human readable string.
    */
   public static String toDateString(long time) {
     return toDateString(time, DATE_FORMAT2, "");
@@ -80,7 +97,7 @@ public class KafkaCruiseControlUtils {
    * @param time time in milliseconds
    * @param dateFormat see formats above
    * @param timeZone will use default if timeZone is set to empty string
-   * @return string representation of date
+   * @return String representation of date
    */
   public static String toDateString(long time, String dateFormat, String timeZone) {
     if (time < 0) {
@@ -131,7 +148,7 @@ public class KafkaCruiseControlUtils {
    * Get a configuration and throw exception if the configuration was not provided.
    * @param configs the config map.
    * @param configName the config to get.
-   * @return the configuration string.
+   * @return The configuration string.
    */
   public static String getRequiredConfig(Map<String, ?> configs, String configName) {
     String value = (String) configs.get(configName);
@@ -170,6 +187,25 @@ public class KafkaCruiseControlUtils {
                                                          + "parameter to ignore this sanity check.", hardGoals, goals,
                                                          SKIP_HARD_GOAL_CHECK_PARAM));
       }
+    }
+  }
+
+  /**
+   * Check to ensure that if requested cluster model completeness requires non-zero number of valid windows in cluster model,
+   * load monitor should have already finished loading all the samples.
+   * Note that even if only one valid window is required, we still need to wait load monitor finish loading all samples. This
+   * is because sample loading follow time order, i.e. the first window loaded is the oldest window and the load information
+   * in that window is probably stale.
+   *
+   * @param completenessRequirements Requested cluster model completeness requirement.
+   * @param loadMonitorTaskRunnerState Current state of load monitor's task runner.
+   */
+  public static void sanityCheckLoadMonitorReadiness(ModelCompletenessRequirements completenessRequirements,
+                                                     LoadMonitorTaskRunner.LoadMonitorTaskRunnerState loadMonitorTaskRunnerState) {
+    if (completenessRequirements.minRequiredNumWindows() > 0 &&
+        loadMonitorTaskRunnerState == LoadMonitorTaskRunner.LoadMonitorTaskRunnerState.LOADING) {
+      throw new IllegalStateException("Unable to generate proposal since load monitor is in "
+                                      + LoadMonitorTaskRunner.LoadMonitorTaskRunnerState.LOADING + " state.");
     }
   }
 
@@ -226,12 +262,17 @@ public class KafkaCruiseControlUtils {
   /**
    * Close the given KafkaZkClient with the default timeout of {@link #KAFKA_ZK_CLIENT_CLOSE_TIMEOUT_MS}.
    *
-   * @param kafkaZkClient KafkaZkClient to be closed
+   * @param kafkaZkClient KafkaZkClient to be closed.
    */
   public static void closeKafkaZkClientWithTimeout(KafkaZkClient kafkaZkClient) {
     closeKafkaZkClientWithTimeout(kafkaZkClient, KAFKA_ZK_CLIENT_CLOSE_TIMEOUT_MS);
   }
 
+  /**
+   * Close the given KafkaZkClient with the given timeout.
+   * @param kafkaZkClient KafkaZkClient to be closed
+   * @param timeoutMs the timeout.
+   */
   public static void closeKafkaZkClientWithTimeout(KafkaZkClient kafkaZkClient, long timeoutMs) {
     closeClientWithTimeout(kafkaZkClient::close, timeoutMs);
   }
@@ -240,7 +281,7 @@ public class KafkaCruiseControlUtils {
    * Check if set a contains any element in set b.
    * @param a the first set.
    * @param b the second set.
-   * @return true if a contains at least one of the element in b. false otherwise;
+   * @return True if a contains at least one of the element in b. false otherwise;
    */
   public static boolean containsAny(Set<Integer> a, Set<Integer> b) {
     return b.stream().mapToInt(i -> i).anyMatch(a::contains);
@@ -248,6 +289,8 @@ public class KafkaCruiseControlUtils {
 
   /**
    * Create an instance of KafkaZkClient with security disabled.
+   * Name of the underlying {@link kafka.zookeeper.ZooKeeperClient} instance is derived using the combination given
+   * metricGroup and metricType with a dash in between.
    *
    * @param connectString Comma separated host:port pairs, each corresponding to a zk server
    * @param metricGroup Metric group
@@ -256,8 +299,9 @@ public class KafkaCruiseControlUtils {
    * @return A new instance of KafkaZkClient
    */
   public static KafkaZkClient createKafkaZkClient(String connectString, String metricGroup, String metricType, boolean zkSecurityEnabled) {
+    String zooKeeperClientName = String.format("%s-%s", metricGroup, metricType);
     return KafkaZkClient.apply(connectString, zkSecurityEnabled, ZK_SESSION_TIMEOUT, ZK_CONNECTION_TIMEOUT, Integer.MAX_VALUE,
-        new SystemTime(), metricGroup, metricType);
+                               new SystemTime(), metricGroup, metricType, Option.apply(zooKeeperClientName));
   }
 
   /**
@@ -289,12 +333,18 @@ public class KafkaCruiseControlUtils {
   /**
    * Close the given AdminClient with the default timeout of {@link #ADMIN_CLIENT_CLOSE_TIMEOUT_MS}.
    *
-   * @param adminClient AdminClient to be closed
+   * @param adminClient AdminClient to be closed.
    */
   public static void closeAdminClientWithTimeout(AdminClient adminClient) {
     closeAdminClientWithTimeout(adminClient, ADMIN_CLIENT_CLOSE_TIMEOUT_MS);
   }
 
+  /**
+   * Close the given AdminClient with the given timeout.
+   *
+   * @param adminClient AdminClient to be closed.
+   * @param timeoutMs the timeout.
+   */
   public static void closeAdminClientWithTimeout(AdminClient adminClient, long timeoutMs) {
     closeClientWithTimeout(adminClient::close, timeoutMs);
   }
@@ -341,6 +391,57 @@ public class KafkaCruiseControlUtils {
     }
 
     return adminClientConfigs;
+  }
+
+  /**
+   * Generate a {@link MetadataResponseData} with the given information -- e.g. for creating bootstrap and test response.
+   *
+   * @param brokers Brokers in the cluster.
+   * @param clusterId Cluster Id.
+   * @param controllerId Controller Id.
+   * @param topicMetadataList Metadata list for the topics in the cluster.
+   * @return A {@link MetadataResponseData} with the given information.
+   */
+  public static MetadataResponse prepareMetadataResponse(List<Node> brokers,
+                                                         String clusterId,
+                                                         int controllerId,
+                                                         List<MetadataResponse.TopicMetadata> topicMetadataList) {
+    MetadataResponseData responseData = new MetadataResponseData();
+    responseData.setThrottleTimeMs(AbstractResponse.DEFAULT_THROTTLE_TIME);
+    brokers.forEach(broker -> responseData.brokers().add(
+        new MetadataResponseData.MetadataResponseBroker().setNodeId(broker.id())
+                                                         .setHost(broker.host())
+                                                         .setPort(broker.port())
+                                                         .setRack(broker.rack())));
+
+    responseData.setClusterId(clusterId);
+    responseData.setControllerId(controllerId);
+    responseData.setClusterAuthorizedOperations(MetadataResponse.AUTHORIZED_OPERATIONS_OMITTED);
+    topicMetadataList.forEach(topicMetadata -> responseData.topics().add(prepareMetadataResponseTopic(topicMetadata)));
+
+    return new MetadataResponse(responseData);
+  }
+
+  private static MetadataResponseData.MetadataResponseTopic prepareMetadataResponseTopic(MetadataResponse.TopicMetadata topicMetadata) {
+    MetadataResponseData.MetadataResponseTopic metadataResponseTopic = new MetadataResponseData.MetadataResponseTopic();
+    metadataResponseTopic.setErrorCode(topicMetadata.error().code())
+                         .setName(topicMetadata.topic())
+                         .setIsInternal(topicMetadata.isInternal())
+                         .setTopicAuthorizedOperations(topicMetadata.authorizedOperations());
+
+    for (MetadataResponse.PartitionMetadata partitionMetadata : topicMetadata.partitionMetadata()) {
+      metadataResponseTopic.partitions().add(
+          new MetadataResponseData.MetadataResponsePartition()
+              .setErrorCode(partitionMetadata.error().code())
+              .setPartitionIndex(partitionMetadata.partition())
+              .setLeaderId(partitionMetadata.leader() == null ? -1 : partitionMetadata.leader().id())
+              .setLeaderEpoch(partitionMetadata.leaderEpoch().orElse(RecordBatch.NO_PARTITION_LEADER_EPOCH))
+              .setReplicaNodes(partitionMetadata.replicas().stream().map(Node::id).collect(Collectors.toList()))
+              .setIsrNodes(partitionMetadata.isr().stream().map(Node::id).collect(Collectors.toList()))
+              .setOfflineReplicas(partitionMetadata.offlineReplicas().stream().map(Node::id).collect(Collectors.toList())));
+    }
+
+    return metadataResponseTopic;
   }
 
   private static void setPasswordConfigIfExists(KafkaCruiseControlConfig configs, Map<String, Object> props, String name) {
@@ -405,7 +506,7 @@ public class KafkaCruiseControlUtils {
    * @param goals The goals to be used for balancing (sorted by priority).
    * @param priorityWeight The impact of having one level higher goal priority on the relative balancedness score.
    * @param strictnessWeight The impact of strictness on the relative balancedness score.
-   * @return the balancedness cost of violating goals by their name.
+   * @return The balancedness cost of violating goals by their name.
    */
   public static Map<String, Double> balancednessCostByGoal(List<Goal> goals, double priorityWeight, double strictnessWeight) {
     if (goals.isEmpty()) {

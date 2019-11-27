@@ -263,6 +263,7 @@ Supported parameters are:
 | rebalance_disk     | boolean    |  whether balance load between disks within each broker or between brokers in cluster  | false|   yes |
 | json     | boolean    | return in JSON format or not      | false      |   yes | 
 | verbose     | boolean    | return detailed state information      | false      |   yes | 
+| reason     | string    | reason for the request     | "No reason provided"      |   yes | 
 
 Similar to the [GET interface for getting proposals](https://github.com/linkedin/cruise-control/wiki/REST-APIs/_edit#get-optimization-proposals), the rebalance can also be based on available valid windows or available valid partitions.
 
@@ -300,6 +301,7 @@ Supported parameters are:
 | throttle_added_broker     | boolean    | whether throttle replica movement to new broker or not   | false|   yes |
 | json     | boolean    | return in JSON format or not      | false      |   yes | 
 | verbose     | boolean    | return detailed state information      | false      |   yes | 
+| reason     | string    | reason for the request     | "No reason provided"      |   yes | 
 
 
 When adding new brokers to a Kafka cluster, Cruise Control makes sure that the **replicas will only be moved from the existing brokers to the provided new broker**, but not moved among existing brokers. 
@@ -334,6 +336,7 @@ Supported parameters are:
 | destination_broker_ids     | list    |  specify brokers to move replicas to   | null|   yes |
 | json     | boolean    | return in JSON format or not      | false      |   yes | 
 | verbose     | boolean    | return detailed state information      | false      |   yes |  
+| reason     | string    | reason for the request     | "No reason provided"      |   yes | 
 
 Similar to adding brokers to a cluster, removing brokers from a cluster will **only move partitions from the brokers to be removed to the other existing brokers**. There won't be partition movements among remaining brokers. And user can specify the destination broker for these replica movement via `destination_broker_ids` parameter.
 
@@ -367,6 +370,7 @@ Supported parameters are:
 | replication_throttle     | long    | upper bound on the bandwidth used to move replicas   | null|   yes |
 | json     | boolean    | return in JSON format or not      | false      |   yes | 
 | verbose     | boolean    | return detailed state information      | false      |   yes |  
+| reason     | string    | reason for the request     | "No reason provided"      |   yes | 
 
 Likewise, users can throttle partition movement, the throttling can be set in the same way as [`rebalance` request](#trigger-a-workload-balance).
 
@@ -391,19 +395,20 @@ Supported parameters are:
 | allow_capacity_estimation     | boolean    | whether allow broker capacity to be estimated     | true      |   yes |
 | concurrent_leader_movements     | integer    | upper bound of ongoing leadership movements     | null      |   yes |
 | skip_urp_demotion     | boolean    | whether skip demoting leader replicas for under replicated partitions     | false      |   yes |
-| exclude_follower_demotion     | boolean    | whether skip demoting follower replicas on the broker to be demoted     | false      |   yes |
+| exclude_follower_demotion     | boolean    | whether skip demoting follower replicas on the broker to be demoted     | true      |   yes |
 | exclude_recently_demoted_brokers     | boolean    | whether allow leader replicas to be moved to recently demoted broker    | false|   yes |
 | replica_movement_strategies     | string    |  [replica movement strategy](https://github.com/linkedin/cruise-control/wiki/Pluggable-Components#replica-movement-strategy) to use   | null|   yes |
 | replication_throttle     | long    | upper bound on the bandwidth used to move replicas   | null|   yes |
 | json     | boolean    | return in JSON format or not      | false      |   yes | 
 | verbose     | boolean    | return detailed state information      | false      |   yes | 
+| reason     | string    | reason for the request     | "No reason provided"      |   yes | 
 
 Demoting a broker/disk is consist of tow steps.
   * Make all the replicas on given broker/disk the least preferred replicas for leadership election
     within their corresponding partitions
   * Trigger a preferred leader election on the partitions to migrate the leader replicas off the broker/disk
 
-Set `skip_urp_demotion` to true will skip the operations on partitions which is currently under replicated; Set `exclude_follower_demotion` will skip operations on the partitions which only have follower replicas on the brokers/disks to be demoted. The purpose of these two parameters is to avoid the URP recovery process blocking demoting execution.
+Set `skip_urp_demotion` to true will skip the operations on partitions which is currently under replicated; Set `exclude_follower_demotion` will skip operations on the partitions which only have follower replicas on the brokers/disks to be demoted. The purpose of the former is to prevent the URP recovery process from blocking the demotion execution, the latter ensures that the demotion operation is limited to leaders.
 
 ### Stop the current proposal execution task
 The following POST request will let Kafka Cruise Control stop an ongoing `rebalance`, `add_broker`,  `remove_broker`, `fix_offline_replica`, `topic_configuration` or `demote_broker` operation:
@@ -470,6 +475,7 @@ Supported parameters are:
 | replication_throttle     | long    | upper bound on the bandwidth used to move replicas   | null|   yes |
 | json     | boolean    | return in JSON format or not      | false      |   yes | 
 | verbose     | boolean    | return detailed state information      | false      |   yes | 
+| reason     | string    | reason for the request     | "No reason provided"      |   yes | 
 
 Changing topic's replication factor will not move any existing replicas. `goals` are used to determine which replica to be deleted(to decrease topic's replication factor) and which broker to assign new replica (to increase topic's replication factor).
 

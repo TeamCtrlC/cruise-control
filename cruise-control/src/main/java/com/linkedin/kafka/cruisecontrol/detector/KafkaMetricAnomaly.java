@@ -6,7 +6,6 @@ package com.linkedin.kafka.cruisecontrol.detector;
 
 import com.linkedin.cruisecontrol.detector.metricanomaly.MetricAnomaly;
 import com.linkedin.kafka.cruisecontrol.KafkaCruiseControl;
-import com.linkedin.kafka.cruisecontrol.detector.notifier.AnomalyType;
 import com.linkedin.kafka.cruisecontrol.exception.KafkaCruiseControlException;
 import com.linkedin.kafka.cruisecontrol.monitor.sampling.holder.BrokerEntity;
 import com.linkedin.kafka.cruisecontrol.servlet.response.OptimizationResult;
@@ -23,7 +22,6 @@ import static com.linkedin.kafka.cruisecontrol.detector.AnomalyDetectorUtils.get
  * A Kafka metric anomaly indicates unexpected rapid changes in metric values of a broker.
  */
 public class KafkaMetricAnomaly implements MetricAnomaly<BrokerEntity> {
-  private static final String ID_PREFIX = AnomalyType.METRIC_ANOMALY.toString();
   private static final Logger LOG = LoggerFactory.getLogger(KafkaMetricAnomaly.class);
   private final KafkaCruiseControl _kafkaCruiseControl;
   private final String _description;
@@ -52,7 +50,7 @@ public class KafkaMetricAnomaly implements MetricAnomaly<BrokerEntity> {
     _brokerEntity = brokerEntity;
     _metricId = metricId;
     _windows = windows;
-    _anomalyId = String.format("%s-%s", ID_PREFIX, UUID.randomUUID().toString().substring(ID_PREFIX.length() + 1));
+    _anomalyId = UUID.randomUUID().toString();
     _optimizationResult = null;
   }
 
@@ -113,7 +111,7 @@ public class KafkaMetricAnomaly implements MetricAnomaly<BrokerEntity> {
    * Get the optimization result of self healing process, or null if no optimization result is available.
    *
    * @param isJson True for JSON response, false otherwise.
-   * @return the optimization result of self healing process, or null if no optimization result is available.
+   * @return The optimization result of self healing process, or null if no optimization result is available.
    */
   String optimizationResult(boolean isJson) {
     if (_optimizationResult == null) {
