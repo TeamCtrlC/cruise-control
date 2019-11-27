@@ -1,6 +1,14 @@
 MonitorState:
-  nullable: true
   type: object
+  required:
+    - state
+    - trained
+    - trainingPct
+    - numMonitoredWindows
+    - numValidPartitions
+    - numTotalPartitions
+    - monitoringCoveragePct
+    - numFlawedPartitions
   properties:
     state:
       type: string
@@ -20,7 +28,6 @@ MonitorState:
     numMonitoredWindows:
       type: number
     monitoredWindows:
-      nullable: true
       type: object
       additionalProperties:
         type: number
@@ -35,16 +42,12 @@ MonitorState:
     numFlawedPartitions:
       type: number
     reasonOfLatestPauseOrResume:
-      nullable: true
       type: string
     bootstrapProgressPct:
-      nullable: true
       type: number
       format: double
     loadingProgressPct:
-      nullable: true
       type: number
       format: double
     error:
-      nullable: true
       type: string

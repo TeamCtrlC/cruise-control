@@ -146,11 +146,11 @@ public class GoalViolationDetector implements Runnable {
             if (clusterModelSemaphore != null) {
               clusterModelSemaphore.close();
             }
-            clusterModelSemaphore = _kafkaCruiseControl.acquireForModelGeneration(new OperationProgress());
+            clusterModelSemaphore = _kafkaCruiseControl.acquireForModelGeneration(new OperationProgress(""));
             // Make cluster model null before generating a new cluster model so the current one can be GCed.
             clusterModel = null;
             clusterModel = _kafkaCruiseControl.clusterModel(goal.clusterModelCompletenessRequirements(),
-                                                            new OperationProgress());
+                                                            new OperationProgress(""));
 
             // If the clusterModel contains dead brokers or disks, goal violation detector will ignore any goal violations.
             // Detection and fix for dead brokers/disks is the responsibility of broker/disk failure detector.

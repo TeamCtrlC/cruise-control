@@ -1,5 +1,6 @@
 CruiseControlState:
   type: object
+  required: []
   properties:
     version:
       type: integer
