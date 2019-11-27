@@ -113,7 +113,7 @@ public class GoalOptimizer implements Runnable {
     _progressUpdateLock = new AtomicBoolean(false);
     // A new AtomicReference with null initial value.
     _proposalGenerationException = new AtomicReference<>();
-    _proposalPrecomputingProgress = new OperationProgress();
+    _proposalPrecomputingProgress = new OperationProgress("");
     _proposalComputationTimer = dropwizardMetricRegistry.timer(MetricRegistry.name("GoalOptimizer", "proposal-computation-timer"));
     _executor = executor;
     _hasOngoingExplicitPrecomputation = false;
@@ -549,7 +549,7 @@ public class GoalOptimizer implements Runnable {
         return;
       }
       OperationProgress operationProgress =
-          _progressUpdateLock.compareAndSet(false, true) ? _proposalPrecomputingProgress : new OperationProgress();
+          _progressUpdateLock.compareAndSet(false, true) ? _proposalPrecomputingProgress : new OperationProgress("");
 
       try (AutoCloseable ignored = _loadMonitor.acquireForModelGeneration(operationProgress)) {
         long startMs = _time.milliseconds();
