@@ -113,7 +113,7 @@ public class GoalOptimizer implements Runnable {
     _progressUpdateLock = new AtomicBoolean(false);
     // A new AtomicReference with null initial value.
     _proposalGenerationException = new AtomicReference<>();
-    _proposalPrecomputingProgress = new OperationProgress();
+    _proposalPrecomputingProgress = new OperationProgress("");
     _proposalComputationTimer = dropwizardMetricRegistry.timer(MetricRegistry.name("GoalOptimizer", "proposal-computation-timer"));
     _executor = executor;
     _hasOngoingExplicitPrecomputation = false;
@@ -211,6 +211,9 @@ public class GoalOptimizer implements Runnable {
     }
   }
 
+  /**
+   * Shutdown the goal optimizer.
+   */
   public void shutdown() {
     LOG.info("Shutting down goal optimizer.");
     _shutdown = true;
@@ -227,16 +230,23 @@ public class GoalOptimizer implements Runnable {
     LOG.info("Goal optimizer shutdown completed.");
   }
 
+  /**
+   * @return The model completeness requirements associated with the default goals.
+   */
   public ModelCompletenessRequirements defaultModelCompletenessRequirements() {
     return _defaultModelCompletenessRequirements;
   }
 
+  /**
+   * @return The same model completeness requirements with {@link #_defaultModelCompletenessRequirements} except with
+   * just a single available window.
+   */
   public ModelCompletenessRequirements modelCompletenessRequirementsForPrecomputing() {
     return _requirementsWithAvailableValidWindows;
   }
 
   /**
-   * Get the analyzer state from the goal optimizer.
+   * @return The analyzer state from the goal optimizer.
    */
   public AnalyzerState state(MetadataClient.ClusterAndGeneration clusterAndGeneration) {
     Map<Goal, Boolean> goalReadiness = new LinkedHashMap<>(_goalsByPriority.size());
@@ -262,6 +272,7 @@ public class GoalOptimizer implements Runnable {
    *
    * @param operationProgress to report the job progress.
    * @param allowCapacityEstimation Allow capacity estimation in cluster model if the requested broker capacity is unavailable.
+   * @return The cached proposals.
    */
   public OptimizerResult optimizations(OperationProgress operationProgress, boolean allowCapacityEstimation)
       throws InterruptedException, KafkaCruiseControlException {
@@ -341,6 +352,7 @@ public class GoalOptimizer implements Runnable {
    * </ul>
    *
    * See {@link GoalOptimizer#optimizations(ClusterModel, List, OperationProgress, Map, OptimizationOptions)}.
+   * @return Results of optimization containing the proposals and stats.
    */
   public OptimizerResult optimizations(ClusterModel clusterModel,
                                        List<Goal> goalsByPriority,
@@ -537,7 +549,7 @@ public class GoalOptimizer implements Runnable {
         return;
       }
       OperationProgress operationProgress =
-          _progressUpdateLock.compareAndSet(false, true) ? _proposalPrecomputingProgress : new OperationProgress();
+          _progressUpdateLock.compareAndSet(false, true) ? _proposalPrecomputingProgress : new OperationProgress("");
 
       try (AutoCloseable ignored = _loadMonitor.acquireForModelGeneration(operationProgress)) {
         long startMs = _time.milliseconds();

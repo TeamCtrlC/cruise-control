@@ -260,6 +260,13 @@ public class UserTaskManager implements Closeable {
     }
   }
 
+  /**
+   * Get the future from the given request.
+   *
+   * @param request HTTP request received by Cruise Control.
+   * @param <T> The returned future type.
+   * @return The future from the given request.
+   */
   @SuppressWarnings("unchecked")
   public <T> T getFuture(HttpServletRequest request) {
     UUID userTaskId = getUserTaskId(request);
@@ -407,17 +414,29 @@ public class UserTaskManager implements Closeable {
    * Update user task status once the execution is done.
    *
    * @param uuid UUID associated with the in-execution user task.
+   * @param completeWithError Whether the task execution finished with error or not.
    */
-  public synchronized void markTaskExecutionFinished(String uuid) {
+  public synchronized void markTaskExecutionFinished(String uuid, boolean completeWithError) {
     if (!_inExecutionUserTaskInfo.userTaskId().equals(UUID.fromString(uuid))) {
       throw new IllegalStateException(String.format("Task %s is not found in UserTaskManager.", uuid));
     }
-    _inExecutionUserTaskInfo.setState(TaskState.COMPLETED);
+    if (completeWithError) {
+      _inExecutionUserTaskInfo.setState(TaskState.COMPLETED_WITH_ERROR);
+    } else {
+      _inExecutionUserTaskInfo.setState(TaskState.COMPLETED);
+    }
     _uuidToCompletedUserTaskInfoMap.get(_inExecutionUserTaskInfo.endPoint().endpointType())
                                    .put(_inExecutionUserTaskInfo.userTaskId(), _inExecutionUserTaskInfo);
     _inExecutionUserTaskInfo = null;
   }
 
+  /**
+   * Get user task by user task id.
+   *
+   * @param userTaskId UUID to uniquely identify task.
+   * @param httpServletRequest the HttpServletRequest.
+   * @return User task by user task id.
+   */
   public synchronized UserTaskInfo getUserTaskByUserTaskId(UUID userTaskId, HttpServletRequest httpServletRequest) {
     if (userTaskId == null) {
       return null;
@@ -479,6 +498,9 @@ public class UserTaskManager implements Closeable {
     return _uuidToActiveUserTaskInfoMap.get(userTaskId);
   }
 
+  /**
+   * @return All user tasks.
+   */
   public synchronized List<UserTaskInfo> getAllUserTasks() {
     List<UserTaskInfo> allUserTasks = new ArrayList<>(_uuidToActiveUserTaskInfoMap.values());
     if (_inExecutionUserTaskInfo != null) {
@@ -659,6 +681,9 @@ public class UserTaskManager implements Closeable {
       return _state;
     }
 
+    /**
+     * @return User request along with its parameters as a String.
+     */
     public String requestWithParams() {
       StringBuilder sb = new StringBuilder(_requestUrl);
       String queryParamDelimiter = "?";
@@ -673,6 +698,12 @@ public class UserTaskManager implements Closeable {
       return  sb.toString();
     }
 
+    /**
+     * Set the state of the task with the given nextState.
+     *
+     * @param nextState The next state of the task.
+     * @return This user task info.
+     */
     public UserTaskInfo setState(TaskState nextState) {
       _state = nextState;
       return this;

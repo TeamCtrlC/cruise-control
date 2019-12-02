@@ -24,6 +24,7 @@ import com.linkedin.kafka.cruisecontrol.async.progress.GeneratingClusterModel;
 import com.linkedin.kafka.cruisecontrol.async.progress.OperationProgress;
 import com.linkedin.kafka.cruisecontrol.async.progress.WaitingForClusterModel;
 import com.linkedin.kafka.cruisecontrol.config.TopicConfigProvider;
+import com.linkedin.kafka.cruisecontrol.executor.Executor;
 import com.linkedin.kafka.cruisecontrol.model.ClusterModel;
 import com.linkedin.kafka.cruisecontrol.monitor.sampling.holder.BrokerEntity;
 import com.linkedin.kafka.cruisecontrol.monitor.sampling.holder.PartitionEntity;
@@ -54,6 +55,7 @@ import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.internals.ClusterResourceListeners;
+import org.apache.kafka.common.utils.LogContext;
 import org.apache.kafka.common.utils.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,6 +78,7 @@ public class LoadMonitor {
   private static final Logger LOG = LoggerFactory.getLogger(LoadMonitor.class);
   // Metadata TTL is set based on experience -- i.e. a short TTL with large metadata may cause excessive load on brokers.
   private static final long METADATA_TTL = 10000L;
+  private static final long METADATA_REFRESH_BACKOFF = 5000L;
   private final int _numPartitionMetricSampleWindows;
   private final LoadMonitorTaskRunner _loadMonitorTaskRunner;
   private final KafkaPartitionMetricSampleAggregator _partitionMetricSampleAggregator;
@@ -107,24 +110,26 @@ public class LoadMonitor {
    *
    * @param config The load monitor configuration.
    * @param time   The time object.
+   * @param executor The proposal executor.
    * @param dropwizardMetricRegistry The sensor registry for cruise control
    * @param metricDef The metric definitions.
    */
   public LoadMonitor(KafkaCruiseControlConfig config,
                      Time time,
+                     Executor executor,
                      MetricRegistry dropwizardMetricRegistry,
                      MetricDef metricDef) {
     this(config,
          new MetadataClient(config,
-                            new Metadata(5000L,
+                            new Metadata(METADATA_REFRESH_BACKOFF,
                                          config.getLong(KafkaCruiseControlConfig.METADATA_MAX_AGE_CONFIG),
-                                         false,
-                                         false,
+                                         new LogContext(),
                                          new ClusterResourceListeners()),
                             METADATA_TTL,
                             time),
          KafkaCruiseControlUtils.createAdminClient(KafkaCruiseControlUtils.parseAdminClientConfigs(config)),
          time,
+         executor,
          dropwizardMetricRegistry,
          metricDef);
   }
@@ -136,6 +141,7 @@ public class LoadMonitor {
               MetadataClient metadataClient,
               AdminClient adminClient,
               Time time,
+              Executor executor,
               MetricRegistry dropwizardMetricRegistry,
               MetricDef metricDef) {
     _config = config;
@@ -165,8 +171,8 @@ public class LoadMonitor {
         MonitorUtils.combineLoadRequirementOptions(AnalyzerUtils.getGoalsByPriority(config));
 
     _loadMonitorTaskRunner =
-        new LoadMonitorTaskRunner(config, _partitionMetricSampleAggregator, _brokerMetricSampleAggregator,
-                                  _metadataClient, metricDef, time, dropwizardMetricRegistry, _brokerCapacityConfigResolver);
+        new LoadMonitorTaskRunner(config, _partitionMetricSampleAggregator, _brokerMetricSampleAggregator, _metadataClient,
+                                  metricDef, time, dropwizardMetricRegistry, _brokerCapacityConfigResolver, executor);
     _clusterModelCreationTimer = dropwizardMetricRegistry.timer(MetricRegistry.name("LoadMonitor",
                                                                                     "cluster-model-creation-timer"));
     _loadMonitorExecutor = Executors.newScheduledThreadPool(2,
@@ -211,7 +217,7 @@ public class LoadMonitor {
   }
 
   /**
-   * Get the state of the load monitor.
+   * @return The state of the load monitor.
    */
   public LoadMonitorState state(OperationProgress operationProgress, MetadataClient.ClusterAndGeneration clusterAndGeneration) {
     LoadMonitorTaskRunner.LoadMonitorTaskRunnerState state = _loadMonitorTaskRunner.state();
@@ -293,14 +299,14 @@ public class LoadMonitor {
   }
 
   /**
-   * Get the topic config provider.
+   * @return The topic config provider.
    */
   public TopicConfigProvider topicConfigProvider() {
     return _topicConfigProvider;
   }
 
   /**
-   * Return the load monitor task runner state.
+   * @return The load monitor task runner state.
    */
   public LoadMonitorTaskRunner.LoadMonitorTaskRunnerState taskRunnerState() {
     return _loadMonitorTaskRunner.state();
@@ -346,7 +352,7 @@ public class LoadMonitor {
   }
 
   /**
-   * Get the cluster information from Kafka metadata.
+   * @return The cluster information from Kafka metadata.
    */
   public Cluster kafkaCluster() {
     return _metadataClient.cluster();
@@ -374,6 +380,7 @@ public class LoadMonitor {
   /**
    * Acquire the semaphore for the cluster model generation.
    * @param operationProgress the progress for the job.
+   * @return A new auto closeable semaphore for the cluster model generation.
    * @throws InterruptedException
    */
   public AutoCloseableSemaphore acquireForModelGeneration(OperationProgress operationProgress)
@@ -392,7 +399,7 @@ public class LoadMonitor {
   /**
    * Get the latest metric values of the brokers. The metric values are from the current active metric window.
    *
-   * @return the latest metric values of brokers.
+   * @return The latest metric values of brokers.
    */
   public Map<BrokerEntity, ValuesAndExtrapolations> currentBrokerMetricValues() {
     return _brokerMetricSampleAggregator.peekCurrentWindow();
@@ -401,7 +408,7 @@ public class LoadMonitor {
   /**
    * Get the latest metric values of the partitions. The metric values are from the current active metric window.
    *
-   * @return the latest metric values of partitions.
+   * @return The latest metric values of partitions.
    */
   public Map<PartitionEntity, ValuesAndExtrapolations> currentPartitionMetricValues() {
     return _partitionMetricSampleAggregator.peekCurrentWindow();
@@ -534,7 +541,7 @@ public class LoadMonitor {
   }
 
   /**
-   * Get the current cluster model generation. This is useful to avoid unnecessary cluster model creation which is
+   * @return The current cluster model generation. This is useful to avoid unnecessary cluster model creation which is
    * expensive.
    */
   public ModelGeneration clusterModelGeneration() {
@@ -577,7 +584,7 @@ public class LoadMonitor {
   }
 
   /**
-   * Check whether the monitored load meets the load requirements.
+   * @return True if the monitored load meets the given completeness requirements, false otherwise.
    */
   public boolean meetCompletenessRequirements(MetadataClient.ClusterAndGeneration clusterAndGeneration,
                                               ModelCompletenessRequirements requirements) {
@@ -589,7 +596,7 @@ public class LoadMonitor {
   }
 
   /**
-   * Check whether the monitored load meets the load requirements.
+   * @return True if the monitored load meets the load requirements, false otherwise.
    */
   public boolean meetCompletenessRequirements(ModelCompletenessRequirements requirements) {
     MetadataClient.ClusterAndGeneration clusterAndGeneration = _metadataClient.refreshMetadata();
@@ -597,7 +604,7 @@ public class LoadMonitor {
   }
 
   /**
-   * @return all the available broker level metrics. Null is returned if nothing is available.
+   * @return All the available broker level metrics. Null is returned if nothing is available.
    */
   public MetricSampleAggregationResult<String, BrokerEntity> brokerMetrics() {
     List<Node> nodes = _metadataClient.cluster().nodes();
@@ -661,7 +668,7 @@ public class LoadMonitor {
     try {
       metricSampleAggregationResult = _partitionMetricSampleAggregator.aggregate(clusterAndGeneration,
                                                                                  System.currentTimeMillis(),
-                                                                                 new OperationProgress());
+                                                                                 new OperationProgress(""));
     } catch (NotEnoughValidWindowsException e) {
       return 0.0;
     }

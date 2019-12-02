@@ -4,6 +4,7 @@
 
 package com.linkedin.kafka.cruisecontrol.common;
 
+import com.linkedin.kafka.cruisecontrol.servlet.response.JsonResponseField;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -15,9 +16,13 @@ import java.util.List;
  * DISK: a broker-level resource.
  */
 public enum Resource {
+  @JsonResponseField
   CPU("cpu", 0, true, true, 0.001),
+  @JsonResponseField
   NW_IN("networkInbound", 1, true, false, 10),
+  @JsonResponseField
   NW_OUT("networkOutbound", 2, true, false, 10),
+  @JsonResponseField
   DISK("disk", 3, false, true, 100);
 
   // EPSILON_PERCENT defines the acceptable nuance when comparing the utilization of the resource.
@@ -49,22 +54,41 @@ public enum Resource {
     _epsilon = epsilon;
   }
 
+  /**
+   * @return The resource type.
+   */
   public String resource() {
     return _resource;
   }
 
+  /**
+   * @return The resource id.
+   */
   public int id() {
     return _id;
   }
 
+  /**
+   * @return True if host resource, false otherwise.
+   */
   public boolean isHostResource() {
     return _isHostResource;
   }
 
+  /**
+   * @return True if broker resource, false otherwise.
+   */
   public boolean isBrokerResource() {
     return _isBrokerResource;
   }
 
+  /**
+   * The epsilon value used in comparing the given values.
+   *
+   * @param value1 The first value used in comparison.
+   * @param value2 The second value used in comparison.
+   * @return The epsilon value used in comparing the given values.
+   */
   public double epsilon(double value1, double value2) {
     return Math.max(_epsilon, EPSILON_PERCENT * (value1 + value2));
   }

@@ -4,11 +4,13 @@
 
 package com.linkedin.kafka.cruisecontrol.model;
 
-import com.linkedin.kafka.cruisecontrol.analyzer.AnalyzerUtils;
 import com.linkedin.kafka.cruisecontrol.common.Resource;
 import com.linkedin.kafka.cruisecontrol.analyzer.BalancingConstraint;
 import com.linkedin.kafka.cruisecontrol.common.Statistic;
 
+import com.linkedin.kafka.cruisecontrol.servlet.response.JsonResponseExternalFields;
+import com.linkedin.kafka.cruisecontrol.servlet.response.JsonResponseField;
+import com.linkedin.kafka.cruisecontrol.servlet.response.JsonResponseClass;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -22,8 +24,12 @@ import static com.linkedin.kafka.cruisecontrol.analyzer.goals.GoalUtils.averageD
 import static com.linkedin.kafka.cruisecontrol.analyzer.goals.GoalUtils.diskUtilizationPercentage;
 import static com.linkedin.kafka.cruisecontrol.monitor.MonitorUtils.UNIT_INTERVAL_TO_PERCENTAGE;
 
-
+@JsonResponseClass
 public class ClusterModelStats {
+  @JsonResponseField
+  public static final String METADATA = "metadata";
+  @JsonResponseField
+  public static final String STATISTICS = "statistics";
   private final Map<Statistic, Map<Resource, Double>> _resourceUtilizationStats;
   private final Map<Statistic, Double> _potentialNwOutUtilizationStats;
   private final Map<Statistic, Number> _replicaStats;
@@ -89,77 +95,77 @@ public class ClusterModelStats {
   }
 
   /**
-   * Get resource utilization stats for the cluster instance that the object was populated with.
+   * @return The resource utilization stats for the cluster instance that the object was populated with.
    */
   public Map<Statistic, Map<Resource, Double>> resourceUtilizationStats() {
     return _resourceUtilizationStats;
   }
 
   /**
-   * Get outbound network utilization stats for the cluster instance that the object was populated with.
+   * @return The potential outbound network utilization stats for the cluster instance that the object was populated with.
    */
   public Map<Statistic, Double> potentialNwOutUtilizationStats() {
     return _potentialNwOutUtilizationStats;
   }
 
   /**
-   * Get replica stats for the cluster instance that the object was populated with.
+   * @return Replica stats for the cluster instance that the object was populated with.
    */
   public Map<Statistic, Number> replicaStats() {
     return _replicaStats;
   }
 
   /**
-   * Get leader replica stats for the cluster instance that the object was populated with.
+   * @return The leader replica stats for the cluster instance that the object was populated with.
    */
   public Map<Statistic, Number> leaderReplicaStats() {
     return _leaderReplicaStats;
   }
 
   /**
-   * Get topic replica stats for the cluster instance that the object was populated with.
+   * @return Topic replica stats for the cluster instance that the object was populated with.
    */
   public Map<Statistic, Number> topicReplicaStats() {
     return _topicReplicaStats;
   }
 
   /**
-   * Get number of brokers for the cluster instance that the object was populated with.
+   * @return The number of brokers for the cluster instance that the object was populated with.
    */
   public int numBrokers() {
     return _numBrokers;
   }
 
   /**
-   * Get number of replicas for the cluster instance that the object was populated with.
+   * @return The number of replicas for the cluster instance that the object was populated with.
    */
   public int numReplicasInCluster() {
     return _numReplicasInCluster;
   }
 
   /**
-   * Get number of number of partitions with offline replicas in the cluster.
+   * @return The number of number of partitions with offline replicas in the cluster.
    */
   public int numPartitionsWithOfflineReplicas() {
     return _numPartitionsWithOfflineReplicas;
   }
 
   /**
-   * Get number of topics for the cluster instance that the object was populated with.
+   * @return The number of topics for the cluster instance that the object was populated with.
    */
   public int numTopics() {
     return _numTopics;
   }
 
   /**
-   * Get number of balanced brokers by resource for the cluster instance that the object was populated with.
+   * @return The number of balanced brokers by resource for the cluster instance that the object was populated with.
    */
   public Map<Resource, Integer> numBalancedBrokersByResource() {
     return _numBalancedBrokersByResource;
   }
 
   /**
-   * Get number of brokers under potential nw out for the cluster instance that the object was populated with.
+   * @return The number of brokers under potential nw out for the cluster instance that the object was populated with.
    */
   public int numBrokersUnderPotentialNwOut() {
     return _numBrokersUnderPotentialNwOut;
@@ -167,23 +173,23 @@ public class ClusterModelStats {
 
   /**
    * This is the utilization matrix generated from {@link ClusterModel#utilizationMatrix()}.
-   * @return non-null if populate has been called else this may return null.
+   * @return Non-null if populate has been called else this may return null.
    */
   public double[][] utilizationMatrix() {
     return _utilizationMatrix;
   }
 
   /**
-   * Get the monitored partition percentage of this cluster model;
+   * @return The monitored partition percentage of this cluster model.
    */
   public double monitoredPartitionsPercentage() {
     return _monitoredPartitionsRatio * UNIT_INTERVAL_TO_PERCENTAGE;
   }
 
   /**
-   * Get the number of snapshot windows used by this cluster model;
+   * @return The number of windows used by this cluster model.
    */
-  public int numSnapshotWindows() {
+  public int numWindows() {
     return _numSnapshotWindows;
   }
 
@@ -192,53 +198,35 @@ public class ClusterModelStats {
    * A disk is taken as unbalanced if its utilization percentage is out of the range centered at its broker utilization
    * percentage with boundary determined by
    * {@link com.linkedin.kafka.cruisecontrol.config.KafkaCruiseControlConfig#DISK_BALANCE_THRESHOLD_CONFIG}.
+   *
+   * @return The number of unbalanced disk in this cluster model.
    */
   public int numUnbalancedDisks() {
     return _numUnbalancedDisks;
   }
 
   /**
-   * Get the standard deviation of disk utilization of this cluster model;
+   * @return The standard deviation of disk utilization of this cluster model.
    */
   public double diskUtilizationStandardDeviation() {
     return _diskUtilizationStDev;
   }
 
-  /*
-   * Return a valid JSON encoded string
+  /**
+   * @return A valid JSON encoded string.
    */
   public String getJSONString() {
     Gson gson = new Gson();
     return gson.toJson(getJsonStructure());
   }
 
-  /*
-   * Return an object that can be further used
-   * to encode into JSON
+  /**
+   * @return An object that can be further used to encode into JSON.
    */
   public Map<String, Object> getJsonStructure() {
-    Map<String, Object> statMap = new HashMap<>();
-    Map<String, Integer> basicMap = new HashMap<>();
-    basicMap.put(AnalyzerUtils.BROKERS, numBrokers());
-    basicMap.put(AnalyzerUtils.REPLICAS, numReplicasInCluster());
-    basicMap.put(AnalyzerUtils.TOPICS, numTopics());
-    List<Statistic> cachedStatistic = Statistic.cachedValues();
-    // List of all statistics AVG, MAX, MIN, STD
-    Map<String, Object> allStatMap = new HashMap<>(cachedStatistic.size());
-    for (Statistic stat : cachedStatistic) {
-      List<Resource> cachedResources = Resource.cachedValues();
-      Map<String, Object> resourceMap = new HashMap<>(cachedResources.size() + 3);
-      for (Resource resource : cachedResources) {
-        resourceMap.put(resource.resource(), resourceUtilizationStats().get(stat).get(resource));
-      }
-      resourceMap.put(AnalyzerUtils.POTENTIAL_NW_OUT, potentialNwOutUtilizationStats().get(stat));
-      resourceMap.put(AnalyzerUtils.REPLICAS, replicaStats().get(stat));
-      resourceMap.put(AnalyzerUtils.LEADER_REPLICAS, leaderReplicaStats().get(stat));
-      resourceMap.put(AnalyzerUtils.TOPIC_REPLICAS, topicReplicaStats().get(stat));
-      allStatMap.put(stat.stat(), resourceMap);
-    }
-    statMap.put(AnalyzerUtils.METADATA, basicMap);
-    statMap.put(AnalyzerUtils.STATISTICS, allStatMap);
+    Map<String, Object> statMap = new HashMap<>(2);
+    statMap.put(METADATA, new ClusterModelStatsMetaData().getJsonStructure());
+    statMap.put(STATISTICS, new ClusterModelStatsValue().getJsonStructure());
     return statMap;
   }
 
@@ -258,10 +246,10 @@ public class ClusterModelStats {
         sb.append(String.format("%s:%12.3f ", resource, resourceUtilizationStats().get(stat).get(resource)));
       }
       sb.append(String.format("%s:%12.3f %s:%s %s:%s %s:%s}%n",
-                              AnalyzerUtils.POTENTIAL_NW_OUT, potentialNwOutUtilizationStats().get(stat),
-                              AnalyzerUtils.REPLICAS, replicaStats().get(stat),
-                              AnalyzerUtils.LEADER_REPLICAS, leaderReplicaStats().get(stat),
-                              AnalyzerUtils.TOPIC_REPLICAS, topicReplicaStats().get(stat)));
+                              ClusterModelStatsValueHolder.POTENTIAL_NW_OUT, potentialNwOutUtilizationStats().get(stat),
+                              ClusterModelStatsMetaData.REPLICAS, replicaStats().get(stat),
+                              ClusterModelStatsValueHolder.LEADER_REPLICAS, leaderReplicaStats().get(stat),
+                              ClusterModelStatsValueHolder.TOPIC_REPLICAS, topicReplicaStats().get(stat)));
     }
     return sb.substring(0, sb.length() - 2);
   }
@@ -480,6 +468,69 @@ public class ClusterModelStats {
     }
     if (numAliveDisks > 0) {
       _diskUtilizationStDev = Math.sqrt(totalDiskUtilizationVariance / numAliveDisks);
+    }
+  }
+
+  @JsonResponseClass
+  private class ClusterModelStatsMetaData {
+    @JsonResponseField
+    static final String BROKERS = "brokers";
+    @JsonResponseField
+    static final String REPLICAS = "replicas";
+    @JsonResponseField
+    static final String TOPICS = "topics";
+
+    Map<String, Integer> getJsonStructure() {
+      Map<String, Integer> basicMap = new HashMap<>(3);
+      basicMap.put(BROKERS, numBrokers());
+      basicMap.put(REPLICAS, numReplicasInCluster());
+      basicMap.put(TOPICS, numTopics());
+      return basicMap;
+    }
+  }
+
+  @JsonResponseClass
+  @JsonResponseExternalFields(Statistic.class)
+  private class ClusterModelStatsValue {
+    Map<String, Object> getJsonStructure() {
+      List<Statistic> cachedStatistic = Statistic.cachedValues();
+      // List of all statistics AVG, MAX, MIN, STD
+      Map<String, Object> allStatMap = new HashMap<>(cachedStatistic.size());
+      for (Statistic stat : cachedStatistic) {
+        allStatMap.put(stat.stat(), new ClusterModelStatsValueHolder(stat).getJsonStructure());
+      }
+      return allStatMap;
+    }
+  }
+
+  @JsonResponseClass
+  @JsonResponseExternalFields(Resource.class)
+  private class ClusterModelStatsValueHolder {
+    @JsonResponseField
+    static final String POTENTIAL_NW_OUT = "potentialNwOut";
+    @JsonResponseField
+    static final String LEADER_REPLICAS = "leaderReplicas";
+    @JsonResponseField
+    static final String TOPIC_REPLICAS = "topicReplicas";
+    @JsonResponseField
+    static final String REPLICAS = "replicas";
+    private Statistic _stat;
+
+    ClusterModelStatsValueHolder(Statistic stat) {
+      _stat = stat;
+    }
+
+    Map<String, Object> getJsonStructure() {
+      List<Resource> cachedResources = Resource.cachedValues();
+      Map<String, Object> resourceMap = new HashMap<>(cachedResources.size() + 4);
+      for (Resource resource : cachedResources) {
+        resourceMap.put(resource.resource(), resourceUtilizationStats().get(_stat).get(resource));
+      }
+      resourceMap.put(POTENTIAL_NW_OUT, potentialNwOutUtilizationStats().get(_stat));
+      resourceMap.put(REPLICAS, replicaStats().get(_stat));
+      resourceMap.put(LEADER_REPLICAS, leaderReplicaStats().get(_stat));
+      resourceMap.put(TOPIC_REPLICAS, topicReplicaStats().get(_stat));
+      return resourceMap;
     }
   }
 }

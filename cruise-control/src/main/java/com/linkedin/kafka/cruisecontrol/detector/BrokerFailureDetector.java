@@ -8,7 +8,6 @@ import com.linkedin.cruisecontrol.detector.Anomaly;
 import com.linkedin.kafka.cruisecontrol.KafkaCruiseControl;
 import com.linkedin.kafka.cruisecontrol.KafkaCruiseControlUtils;
 import com.linkedin.kafka.cruisecontrol.config.KafkaCruiseControlConfig;
-import com.linkedin.kafka.cruisecontrol.monitor.LoadMonitor;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -25,7 +24,6 @@ import org.I0Itec.zkclient.ZkConnection;
 import org.I0Itec.zkclient.exception.ZkMarshallingError;
 import org.I0Itec.zkclient.exception.ZkNodeExistsException;
 import org.I0Itec.zkclient.serialize.ZkSerializer;
-import org.apache.kafka.common.utils.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import scala.collection.JavaConversions;
@@ -50,13 +48,9 @@ public class BrokerFailureDetector {
   private final ZkClient _zkClient;
   private final KafkaZkClient _kafkaZkClient;
   private final Map<Integer, Long> _failedBrokers;
-  private final LoadMonitor _loadMonitor;
   private final Queue<Anomaly> _anomalies;
-  private final Time _time;
 
-  public BrokerFailureDetector(LoadMonitor loadMonitor,
-                               Queue<Anomaly> anomalies,
-                               Time time,
+  public BrokerFailureDetector(Queue<Anomaly> anomalies,
                                KafkaCruiseControl kafkaCruiseControl) {
     KafkaCruiseControlConfig config = kafkaCruiseControl.config();
     String zkUrl = config.getString(KafkaCruiseControlConfig.ZOOKEEPER_CONNECT_CONFIG);
@@ -68,9 +62,7 @@ public class BrokerFailureDetector {
                                                                  zkSecurityEnabled);
     _failedBrokers = new HashMap<>();
     _failedBrokersZkPath = config.getString(KafkaCruiseControlConfig.FAILED_BROKERS_ZK_PATH_CONFIG);
-    _loadMonitor = loadMonitor;
     _anomalies = anomalies;
-    _time = time;
     _kafkaCruiseControl = kafkaCruiseControl;
   }
 
@@ -83,23 +75,30 @@ public class BrokerFailureDetector {
     // Load the failed broker information from zookeeper.
     loadPersistedFailedBrokerList();
     // Detect broker failures.
-    detectBrokerFailures();
+    detectBrokerFailures(false);
     _zkClient.subscribeChildChanges(BrokerIdsZNode.path(), new BrokerFailureListener());
   }
 
-  private synchronized void detectBrokerFailures(Set<Integer> aliveBrokers) {
+  private synchronized void detectBrokerFailures(Set<Integer> aliveBrokers, boolean skipReportingIfNotUpdated) {
     // update the failed broker information based on the current state.
     boolean updated = updateFailedBrokers(aliveBrokers);
     if (updated) {
       // persist the updated failed broker list.
       persistFailedBrokerList();
     }
-    // Report the failures to anomaly detector to handle.
-    reportBrokerFailures();
+    if (!skipReportingIfNotUpdated || updated) {
+      // Report the failures to anomaly detector to handle.
+      reportBrokerFailures();
+    }
   }
 
-  synchronized void detectBrokerFailures() {
-    detectBrokerFailures(aliveBrokers());
+  /**
+   * Detect broker failures. Skip reporting if the failed brokers have not changed and skipReportingIfNotUpdated is true.
+   *
+   * @param skipReportingIfNotUpdated True if broker failure reporting will be skipped if failed brokers have not changed.
+   */
+  synchronized void detectBrokerFailures(boolean skipReportingIfNotUpdated) {
+    detectBrokerFailures(aliveBrokers(), skipReportingIfNotUpdated);
   }
 
   synchronized Map<Integer, Long> failedBrokers() {
@@ -124,19 +123,19 @@ public class BrokerFailureDetector {
    * If {@link #_failedBrokers} has changed, update it.
    *
    * @param aliveBrokers Alive brokers in the cluster.
-   * @return true if {@link #_failedBrokers} has been updated, false otherwise.
+   * @return True if {@link #_failedBrokers} has been updated, false otherwise.
    */
   private boolean updateFailedBrokers(Set<Integer> aliveBrokers) {
     // We get the complete broker list from metadata. i.e. any broker that still has a partition assigned to it is
-    // included in the broker list. If we cannot update metadata in 60 seconds, skip
-    Set<Integer> currentFailedBrokers = _loadMonitor.brokersWithReplicas(MAX_METADATA_WAIT_MS);
+    // included in the broker list. If we cannot update metadata in MAX_METADATA_WAIT_MS, skip
+    Set<Integer> currentFailedBrokers = _kafkaCruiseControl.loadMonitor().brokersWithReplicas(MAX_METADATA_WAIT_MS);
     currentFailedBrokers.removeAll(aliveBrokers);
-    LOG.debug("Alive brokers: {}, failed brokers: {}", aliveBrokers, currentFailedBrokers);
+    LOG.debug("Brokers (alive: {}, failed: {}).", aliveBrokers, currentFailedBrokers);
     // Remove broker that is no longer failed.
     boolean updated = _failedBrokers.entrySet().removeIf(entry -> !currentFailedBrokers.contains(entry.getKey()));
     // Add broker that has just failed.
     for (Integer brokerId : currentFailedBrokers) {
-      if (_failedBrokers.putIfAbsent(brokerId, _time.milliseconds()) == null) {
+      if (_failedBrokers.putIfAbsent(brokerId, _kafkaCruiseControl.timeMs()) == null) {
         updated = true;
       }
     }
@@ -195,7 +194,10 @@ public class BrokerFailureDetector {
 
     @Override
     public void handleChildChange(String parentPath, List<String> currentChildren) {
-      detectBrokerFailures(currentChildren.stream().map(Integer::parseInt).collect(toSet()));
+      // Ensure that broker failures are not reported if there are no updates in already known failed brokers.
+      // Anomaly Detector guarantees that a broker failure detection will not be lost. Skipping reporting if not updated
+      // ensures that the broker failure detector will not report superfluous broker failures due to flaky zNode.
+      detectBrokerFailures(currentChildren.stream().map(Integer::parseInt).collect(toSet()), true);
     }
   }
 

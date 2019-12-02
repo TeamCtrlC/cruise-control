@@ -7,6 +7,7 @@ package com.linkedin.kafka.cruisecontrol.servlet.handler.async.runnable;
 import com.linkedin.cruisecontrol.servlet.response.CruiseControlResponse;
 import com.linkedin.kafka.cruisecontrol.async.progress.OperationProgress;
 import java.lang.reflect.Field;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
@@ -23,7 +24,7 @@ public class OperationFuture extends CompletableFuture<CruiseControlResponse> {
 
   public OperationFuture(String operation) {
     _operation = operation;
-    _operationProgress = new OperationProgress();
+    _operationProgress = new OperationProgress(operation);
     _finishTimeNs = -1;
   }
 
@@ -60,7 +61,7 @@ public class OperationFuture extends CompletableFuture<CruiseControlResponse> {
   }
 
   /**
-   * @return the operation for this future.
+   * @return The operation for this future.
    */
   public String operation() {
     return _operation;
@@ -71,7 +72,7 @@ public class OperationFuture extends CompletableFuture<CruiseControlResponse> {
    * and a non-null thread is set to be execution thread.
    *
    * @param t the thread working for this future.
-   * @return true if the execution thread is set successfully, false otherwise.
+   * @return True if the execution thread is set successfully, false otherwise.
    */
   public synchronized boolean setExecutionThread(Thread t) {
     // The setting only fails if a thread tries to pick up a canceled operation.
@@ -84,21 +85,21 @@ public class OperationFuture extends CompletableFuture<CruiseControlResponse> {
   }
 
   /**
-   * @return the string describing the progress of the operation.
+   * @return The string describing the progress of the operation.
    */
   public String progressString() {
     return _operationProgress.toString();
   }
 
   /**
-   * @return the array describing the progress of the operation.
+   * @return The array describing the progress of the operation.
    */
-  public Object[] getJsonArray() {
-    return _operationProgress.getJsonArray();
+  public Map<String, Object> getJsonStructure() {
+    return _operationProgress.getJsonStructure();
   }
 
   /**
-   * @return the {@link OperationProgress} of this operation.
+   * @return The {@link OperationProgress} of this operation.
    */
   public OperationProgress operationProgress() {
     return _operationProgress;
@@ -113,7 +114,7 @@ public class OperationFuture extends CompletableFuture<CruiseControlResponse> {
   }
 
   /**
-   * @return the integer representing the finish time of this operation.
+   * @return The integer representing the finish time of this operation.
    */
   public long finishTimeNs() {
     return _finishTimeNs;

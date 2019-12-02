@@ -31,6 +31,7 @@ import static com.linkedin.kafka.cruisecontrol.common.TestConstants.TOPIC1;
 import static org.junit.Assert.assertEquals;
 
 public class ReplicationThrottleHelperTest extends CCKafkaIntegrationTestHarness {
+  private static final long TASK_EXECUTION_ALERTING_THRESHOLD_MS = 100L;
 
   @Override
   public int clusterSize() {
@@ -61,7 +62,7 @@ public class ReplicationThrottleHelperTest extends CCKafkaIntegrationTestHarness
   }
 
   private ExecutionTask inProgressTaskForProposal(long id, ExecutionProposal proposal) {
-    ExecutionTask task = new ExecutionTask(id, proposal, ExecutionTask.TaskType.INTER_BROKER_REPLICA_ACTION);
+    ExecutionTask task = new ExecutionTask(id, proposal, ExecutionTask.TaskType.INTER_BROKER_REPLICA_ACTION, TASK_EXECUTION_ALERTING_THRESHOLD_MS);
     task.inProgress(0);
     return task;
   }
@@ -73,7 +74,7 @@ public class ReplicationThrottleHelperTest extends CCKafkaIntegrationTestHarness
   }
 
   @Test
-  public void isNoOpWhenThrottleIsNull() {
+  public void testIsNoOpWhenThrottleIsNull() {
     KafkaZkClient mockKafkaZkClient = EasyMock.strictMock(KafkaZkClient.class);
     EasyMock.replay(mockKafkaZkClient);
 
@@ -106,7 +107,7 @@ public class ReplicationThrottleHelperTest extends CCKafkaIntegrationTestHarness
   }
 
   @Test
-  public void addingThrottlesWithNoPreExistingThrottles() {
+  public void testAddingThrottlesWithNoPreExistingThrottles() {
     createTopics();
     KafkaZkClient kafkaZkClient = KafkaCruiseControlUtils.createKafkaZkClient(zookeeper().connectionString(),
         "ReplicationThrottleHelperTestMetricGroup",
@@ -142,7 +143,7 @@ public class ReplicationThrottleHelperTest extends CCKafkaIntegrationTestHarness
   }
 
   @Test
-  public void addingThrottlesWithPreExistingThrottles() throws InterruptedException {
+  public void testAddingThrottlesWithPreExistingThrottles() throws InterruptedException {
     createTopics();
     KafkaZkClient kafkaZkClient = KafkaCruiseControlUtils.createKafkaZkClient(zookeeper().connectionString(),
         "ReplicationThrottleHelperTestMetricGroup",
@@ -206,7 +207,7 @@ public class ReplicationThrottleHelperTest extends CCKafkaIntegrationTestHarness
   }
 
   @Test
-  public void doNoteRemoveThrottlesForInProgressTasks() {
+  public void testDoNotRemoveThrottlesForInProgressTasks() {
     createTopics();
     KafkaZkClient kafkaZkClient = KafkaCruiseControlUtils.createKafkaZkClient(zookeeper().connectionString(),
         "ReplicationThrottleHelperTestMetricGroup",
@@ -269,7 +270,7 @@ public class ReplicationThrottleHelperTest extends CCKafkaIntegrationTestHarness
   }
 
   @Test
-  public void removeReplicasFromConfigTest() {
+  public void testRemoveReplicasFromConfigTest() {
     Set<String> replicas = new LinkedHashSet<>();
     replicas.add("foo");
     replicas.add("bar");

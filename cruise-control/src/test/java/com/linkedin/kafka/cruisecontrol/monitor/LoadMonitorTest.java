@@ -14,6 +14,7 @@ import com.linkedin.kafka.cruisecontrol.common.MetadataClient;
 import com.linkedin.kafka.cruisecontrol.common.Resource;
 import com.linkedin.kafka.cruisecontrol.config.BrokerCapacityConfigFileResolver;
 import com.linkedin.kafka.cruisecontrol.config.KafkaCruiseControlConfig;
+import com.linkedin.kafka.cruisecontrol.executor.Executor;
 import com.linkedin.kafka.cruisecontrol.model.ClusterModel;
 import com.linkedin.kafka.cruisecontrol.model.ModelParameters;
 import com.linkedin.kafka.cruisecontrol.monitor.metricdefinition.KafkaMetricDef;
@@ -24,20 +25,14 @@ import com.linkedin.kafka.cruisecontrol.monitor.task.LoadMonitorTaskRunner;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 import org.apache.kafka.clients.Metadata;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.DescribeLogDirsResult;
-import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.KafkaFuture;
-import org.apache.kafka.common.Node;
-import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.protocol.Errors;
 import org.apache.kafka.common.requests.DescribeLogDirsResponse;
@@ -48,6 +43,8 @@ import org.junit.Test;
 
 import static com.linkedin.kafka.cruisecontrol.common.TestConstants.TOPIC0;
 import static com.linkedin.kafka.cruisecontrol.common.TestConstants.TOPIC1;
+import static com.linkedin.kafka.cruisecontrol.monitor.MonitorUnitTestUtils.getMetadata;
+import static com.linkedin.kafka.cruisecontrol.executor.ExecutorState.noTaskInProgress;
 import static com.linkedin.kafka.cruisecontrol.servlet.parameters.ParameterUtils.DEFAULT_START_TIME_FOR_CLUSTER_MODEL;
 import static org.apache.kafka.common.KafkaFuture.completedFuture;
 import static org.easymock.EasyMock.*;
@@ -512,6 +509,12 @@ public class LoadMonitorTest {
             .anyTimes();
     EasyMock.replay(mockAdminClient);
 
+    // Create mock executor.
+    Executor mockExecutor = EasyMock.mock(Executor.class);
+    EasyMock.expect(mockExecutor.state())
+            .andReturn(noTaskInProgress(null, null))
+            .anyTimes();
+    EasyMock.replay(mockExecutor);
 
     // Create load monitor.
     Properties props = KafkaCruiseControlUnitTestUtils.getKafkaCruiseControlProperties();
@@ -528,7 +531,7 @@ public class LoadMonitorTest {
       props.setProperty(BrokerCapacityConfigFileResolver.CAPACITY_CONFIG_FILE, capacityConfigFileJBOD);
     }
     KafkaCruiseControlConfig config = new KafkaCruiseControlConfig(props);
-    LoadMonitor loadMonitor = new LoadMonitor(config, mockMetadataClient, mockAdminClient, _time, new MetricRegistry(), METRIC_DEF);
+    LoadMonitor loadMonitor = new LoadMonitor(config, mockMetadataClient, mockAdminClient, _time, mockExecutor, new MetricRegistry(), METRIC_DEF);
 
     KafkaPartitionMetricSampleAggregator aggregator = loadMonitor.partitionSampleAggregator();
 
@@ -544,23 +547,6 @@ public class LoadMonitorTest {
     }
 
     return new TestContext(loadMonitor, aggregator, config, metadata);
-  }
-
-  private Metadata getMetadata(Collection<TopicPartition> partitions) {
-    Node node0 = new Node(0, "localhost", 100, "rack0");
-    Node node1 = new Node(1, "localhost", 100, "rack1");
-    Node[] nodes = {node0, node1};
-    Set<Node> allNodes = new HashSet<>(2);
-    allNodes.add(node0);
-    allNodes.add(node1);
-    Set<PartitionInfo> parts = new HashSet<>(partitions.size());
-    for (TopicPartition tp : partitions) {
-      parts.add(new PartitionInfo(tp.topic(), tp.partition(), node0, nodes, nodes));
-    }
-    Cluster cluster = new Cluster("cluster-id", allNodes, parts, Collections.emptySet(), Collections.emptySet());
-    Metadata metadata = new Metadata(10, 10, false);
-    metadata.update(cluster, Collections.emptySet(), 0);
-    return metadata;
   }
 
   private DescribeLogDirsResult getDescribeLogDirsResult() {

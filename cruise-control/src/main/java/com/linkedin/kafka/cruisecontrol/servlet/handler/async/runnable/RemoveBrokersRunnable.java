@@ -25,7 +25,10 @@ import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.kafka.cruisecontrol.KafkaCruiseControlUtils.*;
+import static com.linkedin.kafka.cruisecontrol.KafkaCruiseControlUtils.goalsByPriority;
+import static com.linkedin.kafka.cruisecontrol.KafkaCruiseControlUtils.sanityCheckCapacityEstimation;
+import static com.linkedin.kafka.cruisecontrol.KafkaCruiseControlUtils.sanityCheckGoals;
+import static com.linkedin.kafka.cruisecontrol.KafkaCruiseControlUtils.sanityCheckLoadMonitorReadiness;
 import static com.linkedin.kafka.cruisecontrol.servlet.handler.async.runnable.RunnableUtils.SELF_HEALING_DRYRUN;
 import static com.linkedin.kafka.cruisecontrol.servlet.handler.async.runnable.RunnableUtils.SELF_HEALING_DESTINATION_BROKER_IDS;
 import static com.linkedin.kafka.cruisecontrol.servlet.handler.async.runnable.RunnableUtils.SELF_HEALING_REPLICA_MOVEMENT_STRATEGY;
@@ -56,10 +59,12 @@ public class RemoveBrokersRunnable extends OperationRunnable {
   protected final boolean _skipHardGoalCheck;
   protected final Pattern _excludedTopics;
   protected final String _uuid;
+  protected final String _reason;
   protected final boolean _excludeRecentlyDemotedBrokers;
   protected final boolean _excludeRecentlyRemovedBrokers;
   protected final ReplicaMovementStrategy _replicaMovementStrategy;
   protected final Long _replicationThrottle;
+  protected final boolean _isTriggeredByUserRequest;
 
   /**
    * Constructor to be used for creating a runnable for self-healing.
@@ -70,7 +75,8 @@ public class RemoveBrokersRunnable extends OperationRunnable {
                                boolean allowCapacityEstimation,
                                boolean excludeRecentlyDemotedBrokers,
                                boolean excludeRecentlyRemovedBrokers,
-                               String anomalyId) {
+                               String anomalyId,
+                               String reason) {
     super(kafkaCruiseControl, new OperationFuture("Broker Failure Self-Healing"));
     _removedBrokerIds = removedBrokerIds;
     _dryRun = SELF_HEALING_DRYRUN;
@@ -87,8 +93,10 @@ public class RemoveBrokersRunnable extends OperationRunnable {
     _replicaMovementStrategy = SELF_HEALING_REPLICA_MOVEMENT_STRATEGY;
     _replicationThrottle = kafkaCruiseControl.config().getLong(KafkaCruiseControlConfig.DEFAULT_REPLICATION_THROTTLE_CONFIG);
     _uuid = anomalyId;
+    _reason = reason;
     _excludeRecentlyDemotedBrokers = excludeRecentlyDemotedBrokers;
     _excludeRecentlyRemovedBrokers = excludeRecentlyRemovedBrokers;
+    _isTriggeredByUserRequest = false;
   }
 
   public RemoveBrokersRunnable(KafkaCruiseControl kafkaCruiseControl,
@@ -111,8 +119,10 @@ public class RemoveBrokersRunnable extends OperationRunnable {
     _replicaMovementStrategy = parameters.replicaMovementStrategy();
     _replicationThrottle = parameters.replicationThrottle();
     _uuid = uuid;
+    _reason = parameters.reason();
     _excludeRecentlyDemotedBrokers = parameters.excludeRecentlyDemotedBrokers();
     _excludeRecentlyRemovedBrokers = parameters.excludeRecentlyRemovedBrokers();
+    _isTriggeredByUserRequest = true;
   }
 
   @Override
@@ -136,6 +146,7 @@ public class RemoveBrokersRunnable extends OperationRunnable {
     }
     ModelCompletenessRequirements modelCompletenessRequirements =
         _kafkaCruiseControl.modelCompletenessRequirements(goalsByPriority).weaker(_modelCompletenessRequirements);
+    sanityCheckLoadMonitorReadiness(modelCompletenessRequirements, _kafkaCruiseControl.getLoadMonitorTaskRunnerState());
     OperationProgress operationProgress = _future.operationProgress();
     try (AutoCloseable ignored = _kafkaCruiseControl.acquireForModelGeneration(operationProgress)) {
       ClusterModel clusterModel = _kafkaCruiseControl.clusterModel(modelCompletenessRequirements, operationProgress);
@@ -168,7 +179,8 @@ public class RemoveBrokersRunnable extends OperationRunnable {
       if (!_dryRun) {
         _kafkaCruiseControl.executeRemoval(result.goalProposals(), _throttleRemovedBrokers, _removedBrokerIds, isKafkaAssignerMode(_goals),
                                            _concurrentInterBrokerPartitionMovements, _concurrentLeaderMovements,
-                                           _executionProgressCheckIntervalMs, _replicaMovementStrategy, _replicationThrottle, _uuid);
+                                           _executionProgressCheckIntervalMs, _replicaMovementStrategy, _replicationThrottle,
+                                           _isTriggeredByUserRequest, _uuid, _reason);
       }
       return result;
     } catch (KafkaCruiseControlException kcce) {
