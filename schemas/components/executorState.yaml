@@ -1,5 +1,11 @@
 ExecutionTask:
   type: object
+  required:
+    - executionId
+    - type
+    - state
+    - proposal
+    - brokerId
   properties:
     executionId:
       type: number
@@ -20,6 +26,11 @@ ExecutionTask:
         - COMPLETED
     proposal:
       type: object
+      required:
+        - topicPartition
+        - oldLeader
+        - oldReplicas
+        - newReplicas
       properties:
         topicPartition:
           type: string
@@ -37,8 +48,9 @@ ExecutionTask:
       type: number
 
 ExecutorState:
-  nullable: true
   type: object
+  required:
+    - state
   properties:
     state:
       type: string
@@ -50,167 +62,124 @@ ExecutorState:
         - LEADER_MOVEMENT_TASK_IN_PROGRESS
         - STOPPING_EXECUTION
     recentlyDemotedBrokers:
-      nullable: true
       type: array
       items:
         type: number
     recentlyRemovedBrokers:
-      nullable: true
       type: array
       items:
         type: number
     triggeredSelfHealingTaskId:
-      nullable: true
       type: string
     triggeredUserTaskId:
-      nullable: true
       type: string
     maximumConcurrentLeaderMovements:
-      nullable: true
       type: number
     numPendingLeadershipMovements:
-      nullable: true
       type: number
     numFinishedLeadershipMovements:
-      nullable: true
       type: number
     numTotalLeadershipMovements:
-      nullable: true
       type: number
     pendingLeadershipMovement:
-      nullable: true
       type: array
       items:
         $ref: '#/ExecutionTask'
     maximumConcurrentPartitionMovementsPerBroker:
-      nullable: true
       type: number
     numInProgressPartitionMovements:
-      nullable: true
       type: number
     abortingPartitions:
-      nullable: true
       type: number
     numPendingPartitionMovements:
-      nullable: true
       type: number
     numFinishedPartitionMovements:
-      nullable: true
       type: number
     numTotalPartitionMovements:
-      nullable: true
       type: number
     finishedDataMovement:
-      nullable: true
       type: number
     totalDataToMove:
-      nullable: true
       type: number
     inProgressPartitionMovement:
-      nullable: true
       type: array
       items:
         $ref: '#/ExecutionTask'
     pendingPartitionMovement:
-      nullable: true
       type: array
       items:
         $ref: '#/ExecutionTask'
     abortingPartitionMovement:
-      nullable: true
       type: array
       items:
         $ref: '#/ExecutionTask'
     abortedPartitionMovement:
-      nullable: true
       type: array
       items:
         $ref: '#/ExecutionTask'
     deadPartitionMovement:
-      nullable: true
       type: array
       items:
         $ref: '#/ExecutionTask'
     completedPartitionMovement:
-      nullable: true
       type: array
       items:
         $ref: '#/ExecutionTask'
     maximumConcurrentIntraBrokerPartitionMovementsPerBroker:
-      nullable: true
       type: number
     numInProgressIntraBrokerPartitionMovements:
-      nullable: true
       type: number
     numAbortingIntraBrokerPartitionMovements:
-      nullable: true
       type: number
     numPendingIntraBrokerPartitionMovements:
-      nullable: true
       type: number
     finishedIntraBrokerDataMovement:
-      nullable: true
       type: number
     numTotalIntraBrokerPartitionMovements:
-      nullable: true
       type: number
     totalIntraBrokerDataToMove:
-      nullable: true
       type: number
     inProgressIntraBrokerPartitionMovement:
-      nullable: true
       type: array
       items:
         $ref: '#/ExecutionTask'
     pendingIntraBrokerPartitionMovement:
-      nullable: true
       type: array
       items:
         $ref: '#/ExecutionTask'
     abortingIntraBrokerPartitionMovement:
-      nullable: true
       type: array
       items:
         $ref: '#/ExecutionTask'
     abortedIntraBrokerPartitionMovement:
-      nullable: true
       type: array
       items:
         $ref: '#/ExecutionTask'
     deadIntraBrokerPartitionMovement:
-      nullable: true
       type: array
       items:
         $ref: '#/ExecutionTask'
     completedIntraBrokerPartitionMovement:
-      nullable: true
       type: array
       items:
         $ref: '#/ExecutionTask'
     numCancelledLeadershipMovements:
-      nullable: true
       type: number
     numCancelledPartitionMovements:
-      nullable: true
       type: number
     numCancelledIntraBrokerPartitionMovements:
-      nullable: true
       type: number
     cancelledLeadershipMovement:
-      nullable: true
       type: array
       items:
         $ref: '#/ExecutionTask'
     cancelledPartitionMovement:
-      nullable: true
       type: array
       items:
         $ref: '#/ExecutionTask'
     cancelledIntraBrokerPartitionMovement:
-      nullable: true
       type: array
       items:
         $ref: '#/ExecutionTask'
     error:
-      nullable: true
       type: string

@@ -1,6 +1,8 @@
 AnalyzerState:
-  nullable: true
   type: object
+  required:
+    - isProposalReady
+    - readyGoals
   properties:
     isProposalReady:
       type: boolean
@@ -9,15 +11,22 @@ AnalyzerState:
       items:
         type: string
     goalReadiness:
-      nullable: true
       type: array
       items:
         type: object
+        required:
+          - name
+          - modelCompleteRequirement
+          - status
         properties:
           name:
             type: string
           modelCompleteRequirement:
             type: object
+            required:
+              - requiredNumSnapshots
+              - minMonitoredPartitionsPercentage
+              - includeAllTopics
             properties:
               requiredNumSnapshots:
                 type: number
