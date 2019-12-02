@@ -27,7 +27,8 @@ public class ParameterJsonStructureTest {
     _endpointToClass.put("/kafkacruisecontrol/partition_load", PartitionLoadParameters.class);
     _endpointToClass.put("/kafkacruisecontrol/rebalance", RebalanceParameters.class);
     _endpointToClass.put("/kafkacruisecontrol/state", CruiseControlStateParameters.class);
-    }
+    _endpointToClass.put("/kafkacruisecontrol/topic_configuration", TopicConfigurationParameters.class);
+  }
 
   @Test
   public void loadOpenApiSpec() throws Exception {
@@ -44,7 +45,6 @@ public class ParameterJsonStructureTest {
       Assert.assertTrue(_endpointToClass.containsKey(endpoint));
       Assert.assertEquals(schema.getParameters(endpoint), ((CruiseControlParameters) (_endpointToClass.get(endpoint).newInstance())).caseInsensitiveParameterNames());
     }
-//    System.out.println(schema);
   }
 
   /**
