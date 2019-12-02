@@ -26,7 +26,7 @@ public class ParameterJsonStructureTest {
   private Map<String, Class> _endpointToClass;
   OpenAPI _openAPI;
   /**
-   * 
+   * Specify endpoints to be tested
    */
   @Before
   public void setupParameterClasses() {
