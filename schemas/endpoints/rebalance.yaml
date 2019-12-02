@@ -85,6 +85,12 @@ RebalanceEndpoint:
         schema: 
           type: boolean
           default: false
+      - name: exclude_recently_removed_brokers
+        in: query
+        description: Whether to allow leader replicas to be moved to recently removed broker
+        schema:
+          type: boolean
+          default: false
       - name: replica_movement_strategies
         in: query
         description: Replica movement strategies to use		
