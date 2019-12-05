@@ -1,0 +1,37 @@
+UserTasksState:
+  type: object
+  required:
+    - userTasks
+    - version
+  properties:
+    userTasks:
+      type: array
+      items:
+        type: object
+        required:
+          - UserTaskId
+          - RequestURL
+          - ClientIdentity
+          - StartMs
+          - Status
+        properties:
+          UserTaskId:
+            type: string
+          RequestURL:
+            type: string
+          ClientIdentity:
+            type: string
+          StartMs:
+            type: string
+          Status:
+            type: string
+            enum:
+              - Active
+              - InExecution
+              - Completed
+              - CompletedWithError
+          originalResponse:
+            type: string
+    version:
+      type: integer
+      format: int32
