@@ -1,0 +1,170 @@
+RemoveBrokerEndpoint:
+  post:
+    summary: Remove/decomission specified brokers.
+    parameters:
+      - name: brokerid
+          in: query
+          description: List of target broker ids
+          schema:
+            type: set
+            items:
+              type: integer
+            # default is a null set if no values are provided
+      - name: dryrun
+          in: query
+          description: Whether dry-run the request or not	
+          schema: 
+            type: boolean
+            default: true
+      - name: throttle_removed_broker
+          in: query
+          description: Whether to throttle the added broker
+          schema: 
+            type: boolean
+            default: true
+      - name: goals
+          in: query
+          description: list of goals used to generate proposal
+          schema: 
+            type: array
+            items:
+              type: string
+              # default is every goal
+      - name: allow_capacity_estimation
+          in: query
+          description: Whether to allow capacity estimation when cruise-control is unable to obtain all per-broker capacity information
+          schema:
+            type: boolean
+            default: true
+      - name: concurrent_partition_movements_per_broker
+          in: query
+          description: The maximum number of partitions the executor will move to or out of a broker at the same time
+          schema:
+            type: integer
+            default: 5
+            format: int32
+            minimum: 1
+      - name: concurrent_leader_movements
+          in: query
+          description: The maximum number of leader movements the executor will take as one batch
+          schema:
+            type: integer
+            default: 1000
+            format: int32
+            minimum: 1
+      - name: json
+          in: query
+          description: Whether to return in JSON format or not
+          schema:
+            type: boolean
+            default: false
+      - name: skip_hard_goal_check
+          in: query
+          description: Whether to allow hard goal be skipped in proposal generation
+          schema:
+            type: boolean
+            default: false
+      - name: excluded_topics
+          in: query
+          description: Whether to allow hard goal be skipped in proposal generation, a pattern regex
+          schema:
+            type: string
+            default: null
+      - name: kafka_assigner
+          in: query
+          description: Whether to use Kafka assigner mode to general proposal
+          schema:
+            type: boolean
+            default: false
+      - name: use_ready_default_goals
+          in: query
+          description: Whether to only use ready goals to generate proposal
+          schema:
+            type: boolean
+            default: false
+      - name: verbose
+          in: query
+          description: Return detailed state information
+          schema:
+            type: boolean
+            default: false
+      - name: exclude_recently_demoted_brokers
+          in: query
+          description: Whether to allow leader replicas to be moved to recently demoted broker
+          schema:
+            type: boolean
+            default: false
+      - name: exclude_recently_removed_brokers
+          in: query
+          description:  Whether to allow leader replicas to be moved to recently demoted broker
+          schema:
+            type: boolean
+            default: false
+      - name: replica_movement_strategies
+          in: query
+          description: Replica movement strategies to use
+          schema:
+            type: array
+            items:
+              type: string
+            default: null
+      - name: destination_broker_ids
+          in: query
+          description: Comma-separated and/or space-separated list of broker IDs
+          schema:
+            type: set
+            items:
+              items:
+              type: integer
+            # default is a empty set if no values are provided
+      - name: execution_progress_check_interval_ms
+          in: query
+          description: Execution progress check interval in milliseconds
+          schema:
+            type: long
+            format: int64
+            minimum: 5000
+      - name: reason
+          in: query
+          description: Reason for request
+          schema:
+            type: string
+    responses:
+       '200':
+         description: |-
+           Successful add brokers response
+         content:
+           application/json:
+             schema:
+               $ref: '../responses/optimzationResult.yaml#/OptimizationResult'
+       '202':
+         description: |-
+           Add brokers in progress
+         content:
+           application/json:
+             schema:
+               $ref: '../responses/progressResult.yaml#/ProgressResult'
+  post:
+    summary: Remove/decomission specified brokers.
+    parameters:
+      - name: review_id
+         in: query
+         description: Used when two step verification is enabled, mutually exclusive with all other parameters
+         schema:
+           type: integer
+           # No default value, has to exist
+    responses:
+       '200':
+         description: |-
+           Successful add brokers response
+         content:
+           application/json:
+             schema:
+               $ref: '../responses/optimzationResult.yaml#/OptimizationResult'
+       '202':
+         description: |-
+           Add brokers in progress
+         content:
+           application/json:
+             schema:
+               $ref: '../responses/progressResult.yaml#/ProgressResult'
