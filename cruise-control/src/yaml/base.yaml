@@ -8,3 +8,9 @@ paths:
     $ref: 'endpoints/partitionLoad.yaml#/PartitionLoadEndpoint'
   /kafkacruisecontrol/rebalance:
     $ref: 'endpoints/rebalance.yaml#/RebalanceEndpoint'
+  /kafkacruisecontrol/state:
+    $ref: 'endpoints/state.yaml#/StateEndpoint'
+  /kafkacruisecontrol/topic_configuration:
+    $ref: 'endpoints/topicConfiguration.yaml#/TopicConfigurationEndpoint'
+  /kafkacruisecontrol/user_tasks:
+    $ref: 'endpoints/userTasks.yaml#/UserTasksEndpoint'
