@@ -30,13 +30,22 @@ import static com.linkedin.kafka.cruisecontrol.servlet.response.ResponseUtils.VE
 import static java.lang.Math.max;
 
 
+@JsonResponseClass
+@JsonResponseExternalFields(ResponseUtils.class)
 public class UserTaskState extends AbstractCruiseControlResponse {
+  @JsonResponseField
   protected static final String USER_TASK_ID = "UserTaskId";
+  @JsonResponseField
   protected static final String REQUEST_URL = "RequestURL";
+  @JsonResponseField
   protected static final String CLIENT_ID = "ClientIdentity";
+  @JsonResponseField
   protected static final String START_MS = "StartMs";
+  @JsonResponseField
   protected static final String STATUS = "Status";
+  @JsonResponseField
   protected static final String USER_TASKS = "userTasks";
+  @JsonResponseField
   protected static final String ORIGINAL_RESPONSE = "originalResponse";
   protected final List<UserTaskManager.UserTaskInfo> _userTasks;
 

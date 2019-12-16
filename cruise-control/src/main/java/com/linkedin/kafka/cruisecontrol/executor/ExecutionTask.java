@@ -38,12 +38,19 @@ import static com.linkedin.kafka.cruisecontrol.executor.ExecutionTask.State.*;
  * An <tt>ABORTING</tt> task becomes <tt>DEAD</tt> if the rollback of the original task encountered an error.
  * </pre>
  */
+@JsonResponseClass
 public class ExecutionTask implements Comparable<ExecutionTask> {
+  @JsonResponseField
   private static final String EXECUTION_ID = "executionId";
+  @JsonResponseField
   private static final String TYPE = "type";
+  @JsonResponseField
   private static final String STATE = "state";
+  @JsonResponseField
   private static final String PROPOSAL = "proposal";
+  @JsonResponseField
   private static final String BROKER_ID = "brokerId";
+
   private static final Map<State, Set<State>> VALID_TRANSFER = new HashMap<>();
   private final TaskType _type;
   private final long _executionId;

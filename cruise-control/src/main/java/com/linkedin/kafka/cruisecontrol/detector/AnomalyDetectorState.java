@@ -30,32 +30,56 @@ import static com.linkedin.kafka.cruisecontrol.detector.notifier.KafkaAnomalyTyp
 import static com.linkedin.kafka.cruisecontrol.detector.notifier.KafkaAnomalyType.BROKER_FAILURE;
 import static com.linkedin.kafka.cruisecontrol.detector.notifier.KafkaAnomalyType.DISK_FAILURE;
 
-
+@JsonResponseClass
 public class AnomalyDetectorState {
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyDetectorState.class);
+  @JsonResponseField
   private static final String DETECTION_MS = "detectionMs";
+  @JsonResponseField
   private static final String DETECTION_DATE = "detectionDate";
+  @JsonResponseField
   private static final String ANOMALY_ID = "anomalyId";
+  @JsonResponseField
   private static final String STATUS = "status";
+  @JsonResponseField
   private static final String STATUS_UPDATE_MS = "statusUpdateMs";
+  @JsonResponseField
   private static final String STATUS_UPDATE_DATE = "statusUpdateDate";
+  @JsonResponseField
   private static final String FIXABLE_VIOLATED_GOALS = "fixableViolatedGoals";
+  @JsonResponseField
   private static final String UNFIXABLE_VIOLATED_GOALS = "unfixableViolatedGoals";
+  @JsonResponseField
   private static final String FAILED_BROKERS_BY_TIME_MS = "failedBrokersByTimeMs";
+  @JsonResponseField
   private static final String FAILED_DISKS_BY_TIME_MS = "failedDisksByTimeMs";
+  @JsonResponseField
   private static final String DESCRIPTION = "description";
+  @JsonResponseField
   private static final String SELF_HEALING_ENABLED = "selfHealingEnabled";
+  @JsonResponseField
   private static final String SELF_HEALING_DISABLED = "selfHealingDisabled";
+  @JsonResponseField
   private static final String SELF_HEALING_ENABLED_RATIO = "selfHealingEnabledRatio";
+  @JsonResponseField
   private static final String RECENT_GOAL_VIOLATIONS = "recentGoalViolations";
+  @JsonResponseField
   private static final String RECENT_BROKER_FAILURES = "recentBrokerFailures";
+  @JsonResponseField
   private static final String RECENT_METRIC_ANOMALIES = "recentMetricAnomalies";
+  @JsonResponseField
   private static final String RECENT_DISK_FAILURES = "recentDiskFailures";
+  @JsonResponseField
   private static final String ONGOING_SELF_HEALING_ANOMALY = "ongoingSelfHealingAnomaly";
+  @JsonResponseField
   private static final String OPTIMIZATION_RESULT = "optimizationResult";
+  @JsonResponseField
   private static final String METRICS = "metrics";
+  @JsonResponseField
   private static final String MEAN_TIME_BETWEEN_ANOMALIES_MS = "meanTimeBetweenAnomaliesMs";
+  @JsonResponseField
   private static final String MEAN_TIME_TO_START_FIX_MS = "meanTimeToStartFixMs";
+  @JsonResponseField
   private static final String BALANCEDNESS_SCORE = "balancednessScore";
   // Package private for testing.
   static final String NUM_SELF_HEALING_STARTED = "numSelfHealingStarted";

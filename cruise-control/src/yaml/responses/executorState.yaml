@@ -162,27 +162,6 @@ ExecutionTask:
         - DEAD
         - COMPLETED
     proposal:
-      $ref: '#/ExecutionTaskProposal'
+      $ref: './executionProposal.yaml#/ExecutionProposal'
     brokerId:
       type: number
-
-ExecutionTaskProposal:
-  type: object
-  required:
-    - topicPartition
-    - oldLeader
-    - oldReplicas
-    - newReplicas
-  properties:
-    topicPartition:
-      type: string
-    oldLeader:
-      type: number
-    oldReplicas:
-      type: array
-      items:
-        type: number
-    newReplicas:
-      type: array
-      items:
-        type: number
