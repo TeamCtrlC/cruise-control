@@ -13,29 +13,35 @@ AnalyzerState:
     goalReadiness:
       type: array
       items:
-        type: object
-        required:
-          - name
-          - modelCompleteRequirement
-          - status
-        properties:
-          name:
-            type: string
-          modelCompleteRequirement:
-            type: object
-            required:
-              - requiredNumSnapshots
-              - minMonitoredPartitionsPercentage
-              - includeAllTopics
-            properties:
-              requiredNumSnapshots:
-                type: number
-              minMonitoredPartitionsPercentage:
-                type: number
-              includeAllTopics:
-                type: boolean
-          status:
-            type: string
-            enum:
-              - ready
-              - notReady
+        $ref: '#/GoalReadinessRecord'
+
+GoalReadinessRecord:
+  type: object
+  required:
+    - name
+    - modelCompleteRequirement
+    - status
+  properties:
+    name:
+      type: string
+    modelCompleteRequirement:
+      $ref: '#/ModelCompleteRequirement'
+    status:
+      type: string
+      enum:
+        - ready
+        - notReady
+
+ModelCompleteRequirement:
+  type: object
+  required:
+    - requiredNumSnapshots
+    - minMonitoredPartitionsPercentage
+    - includeAllTopics
+  properties:
+    requiredNumSnapshots:
+      type: number
+    minMonitoredPartitionsPercentage:
+      type: number
+    includeAllTopics:
+      type: boolean
