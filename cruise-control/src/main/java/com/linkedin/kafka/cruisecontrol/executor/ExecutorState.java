@@ -14,56 +14,103 @@ import static com.linkedin.kafka.cruisecontrol.executor.ExecutionTask.State.*;
 import static com.linkedin.kafka.cruisecontrol.executor.ExecutionTask.TaskType.*;
 import static com.linkedin.kafka.cruisecontrol.executor.ExecutionTaskTracker.ExecutionTasksSummary;
 
+@JsonResponseClass
 public class ExecutorState {
+  @JsonResponseField
   private static final String TRIGGERED_USER_TASK_ID = "triggeredUserTaskId";
+  @JsonResponseField
   private static final String TRIGGERED_SELF_HEALING_TASK_ID = "triggeredSelfHealingTaskId";
+  @JsonResponseField
   private static final String TRIGGERED_TASK_REASON = "triggeredTaskReason";
+  @JsonResponseField
   private static final String STATE = "state";
+  @JsonResponseField
   private static final String RECENTLY_DEMOTED_BROKERS = "recentlyDemotedBrokers";
+  @JsonResponseField
   private static final String RECENTLY_REMOVED_BROKERS = "recentlyRemovedBrokers";
 
+  @JsonResponseField
   private static final String NUM_TOTAL_LEADERSHIP_MOVEMENTS = "numTotalLeadershipMovements";
+  @JsonResponseField
   private static final String NUM_PENDING_LEADERSHIP_MOVEMENTS = "numPendingLeadershipMovements";
+  @JsonResponseField
   private static final String NUM_CANCELLED_LEADERSHIP_MOVEMENTS = "numCancelledLeadershipMovements";
+  @JsonResponseField
   private static final String NUM_FINISHED_LEADERSHIP_MOVEMENTS = "numFinishedLeadershipMovements";
+  @JsonResponseField
   private static final String PENDING_LEADERSHIP_MOVEMENT = "pendingLeadershipMovement";
+  @JsonResponseField
   private static final String CANCELLED_LEADERSHIP_MOVEMENT = "cancelledLeadershipMovement";
+  @JsonResponseField
   private static final String MAXIMUM_CONCURRENT_LEADER_MOVEMENTS = "maximumConcurrentLeaderMovements";
 
+  @JsonResponseField
   private static final String NUM_TOTAL_INTER_BROKER_PARTITION_MOVEMENTS = "numTotalPartitionMovements";
+  @JsonResponseField
   private static final String NUM_PENDING_INTER_BROKER_PARTITION_MOVEMENTS = "numPendingPartitionMovements";
+  @JsonResponseField
   private static final String NUM_CANCELLED_INTER_BROKER_PARTITION_MOVEMENTS = "numCancelledPartitionMovements";
+  @JsonResponseField
   private static final String NUM_IN_PROGRESS_INTER_BROKER_PARTITION_MOVEMENTS = "numInProgressPartitionMovements";
+  @JsonResponseField
   private static final String NUM_ABORTING_INTER_BROKER_PARTITION_MOVEMENTS = "abortingPartitions";
+  @JsonResponseField
   private static final String NUM_FINISHED_INTER_BROKER_PARTITION_MOVEMENTS = "numFinishedPartitionMovements";
+  @JsonResponseField
   private static final String IN_PROGRESS_INTER_BROKER_PARTITION_MOVEMENT = "inProgressPartitionMovement";
+  @JsonResponseField
   private static final String PENDING_INTER_BROKER_PARTITION_MOVEMENT = "pendingPartitionMovement";
+  @JsonResponseField
   private static final String CANCELLED_INTER_BROKER_PARTITION_MOVEMENT = "cancelledPartitionMovement";
+  @JsonResponseField
   private static final String DEAD_INTER_BROKER_PARTITION_MOVEMENT = "deadPartitionMovement";
+  @JsonResponseField
   private static final String COMPLETED_INTER_BROKER_PARTITION_MOVEMENT = "completedPartitionMovement";
+  @JsonResponseField
   private static final String ABORTING_INTER_BROKER_PARTITION_MOVEMENT = "abortingPartitionMovement";
+  @JsonResponseField
   private static final String ABORTED_INTER_BROKER_PARTITION_MOVEMENT = "abortedPartitionMovement";
+  @JsonResponseField
   private static final String FINISHED_INTER_BROKER_DATA_MOVEMENT = "finishedDataMovement";
+  @JsonResponseField
   private static final String TOTAL_INTER_BROKER_DATA_TO_MOVE = "totalDataToMove";
+  @JsonResponseField
   private static final String MAXIMUM_CONCURRENT_INTER_BROKER_PARTITION_MOVEMENTS_PER_BROKER = "maximumConcurrentPartitionMovementsPerBroker";
 
+  @JsonResponseField
   private static final String NUM_TOTAL_INTRA_BROKER_PARTITION_MOVEMENTS = "numTotalIntraBrokerPartitionMovements";
+  @JsonResponseField
   private static final String NUM_FINISHED_INTRA_BROKER_PARTITION_MOVEMENTS = "numFinishedIntraBrokerPartitionMovements";
+  @JsonResponseField
   private static final String NUM_IN_PROGRESS_INTRA_BROKER_PARTITION_MOVEMENTS = "numInProgressIntraBrokerPartitionMovements";
+  @JsonResponseField
   private static final String NUM_ABORTING_INTRA_BROKER_PARTITION_MOVEMENTS = "numAbortingIntraBrokerPartitionMovements";
+  @JsonResponseField
   private static final String NUM_PENDING_INTRA_BROKER_PARTITION_MOVEMENTS = "numPendingIntraBrokerPartitionMovements";
+  @JsonResponseField
   private static final String NUM_CANCELLED_INTRA_BROKER_PARTITION_MOVEMENTS = "numCancelledIntraBrokerPartitionMovements";
+  @JsonResponseField
   private static final String IN_PROGRESS_INTRA_BROKER_PARTITION_MOVEMENT = "inProgressIntraBrokerPartitionMovement";
+  @JsonResponseField
   private static final String PENDING_INTRA_BROKER_PARTITION_MOVEMENT = "pendingIntraBrokerPartitionMovement";
+  @JsonResponseField
   private static final String CANCELLED_INTRA_BROKER_PARTITION_MOVEMENT = "cancelledIntraBrokerPartitionMovement";
+  @JsonResponseField
   private static final String DEAD_INTRA_BROKER_PARTITION_MOVEMENT = "deadIntraBrokerPartitionMovement";
+  @JsonResponseField
   private static final String COMPLETED_INTRA_BROKER_PARTITION_MOVEMENT = "completedIntraBrokerPartitionMovement";
+  @JsonResponseField
   private static final String ABORTING_INTRA_BROKER_PARTITION_MOVEMENT = "abortingIntraBrokerPartitionMovement";
+  @JsonResponseField
   private static final String ABORTED_INTRA_BROKER_PARTITION_MOVEMENT = "abortedIntraBrokerPartitionMovement";
+  @JsonResponseField
   private static final String FINISHED_INTRA_BROKER_DATA_MOVEMENT = "finishedIntraBrokerDataMovement";
+  @JsonResponseField
   private static final String TOTAL_INTRA_BROKER_DATA_TO_MOVE = "totalIntraBrokerDataToMove";
+  @JsonResponseField
   private static final String MAXIMUM_CONCURRENT_INTRA_BROKER_PARTITION_MOVEMENTS_PER_BROKER = "maximumConcurrentIntraBrokerPartitionMovementsPerBroker";
 
+  @JsonResponseField
   private static final String ERROR = "error";
 
   public enum State {

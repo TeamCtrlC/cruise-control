@@ -1,52 +1,3 @@
-ExecutionTask:
-  type: object
-  required:
-    - executionId
-    - type
-    - state
-    - proposal
-    - brokerId
-  properties:
-    executionId:
-      type: number
-    type:
-      type: string
-      enum:
-        - INTER_BROKER_REPLICA_ACTION
-        - INTRA_BROKER_REPLICA_ACTION
-        - LEADER_ACTION
-    state:
-      type: string
-      enum:
-        - PENDING
-        - IN_PROGRESS
-        - ABORTING
-        - ABORTED
-        - DEAD
-        - COMPLETED
-    proposal:
-      type: object
-      required:
-        - topicPartition
-        - oldLeader
-        - oldReplicas
-        - newReplicas
-      properties:
-        topicPartition:
-          type: string
-        oldLeader:
-          type: number
-        oldReplicas:
-          type: array
-          items:
-            type: number
-        newReplicas:
-          type: array
-          items:
-            type: number
-    brokerId:
-      type: number
-
 ExecutorState:
   type: object
   required:
@@ -183,3 +134,34 @@ ExecutorState:
         $ref: '#/ExecutionTask'
     error:
       type: string
+
+ExecutionTask:
+  type: object
+  required:
+    - executionId
+    - type
+    - state
+    - proposal
+    - brokerId
+  properties:
+    executionId:
+      type: number
+    type:
+      type: string
+      enum:
+        - INTER_BROKER_REPLICA_ACTION
+        - INTRA_BROKER_REPLICA_ACTION
+        - LEADER_ACTION
+    state:
+      type: string
+      enum:
+        - PENDING
+        - IN_PROGRESS
+        - ABORTING
+        - ABORTED
+        - DEAD
+        - COMPLETED
+    proposal:
+      $ref: './executionProposal.yaml#/ExecutionProposal'
+    brokerId:
+      type: number
