@@ -16,14 +16,18 @@ import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 import static com.linkedin.kafka.cruisecontrol.config.KafkaCruiseControlConfig.DEFAULT_ANOMALY_DETECTION_ALLOW_CAPACITY_ESTIMATION_CONFIG;
-import static com.linkedin.kafka.cruisecontrol.config.KafkaCruiseControlConfig.DEFAULT_BROKER_FAILURE_EXCLUDE_RECENT_BROKERS_CONFIG;
-import static com.linkedin.kafka.cruisecontrol.config.KafkaCruiseControlConfig.DEFAULT_GOAL_VIOLATION_EXCLUDE_RECENT_BROKERS_CONFIG;
+import static com.linkedin.kafka.cruisecontrol.config.KafkaCruiseControlConfig.DEFAULT_SELF_HEALING_EXCLUDE_RECENT_BROKERS_CONFIG;
 
 
 /**
  * A test util class.
  */
 public class KafkaCruiseControlUnitTestUtils {
+  public static final int ANOMALY_DETECTOR_INITIAL_QUEUE_SIZE = 10;
+  public static final String OPENAPI_SPEC_PATH = System.getProperty("user.dir") + "/src/yaml/base.yaml";
+  public static final String CRUISE_CONTROL_PACKAGE = "com.linkedin.kafka.cruisecontrol";
+  public static final String JSON_CONTENT_TYPE = "application/json";
+  public static final String PLAIN_TEXT_CONTENT_TYPE = "text/plain";
 
   private KafkaCruiseControlUnitTestUtils() {
 
@@ -51,14 +55,10 @@ public class KafkaCruiseControlUnitTestUtils {
     props.setProperty(KafkaCruiseControlConfig.GOAL_VIOLATION_DISTRIBUTION_THRESHOLD_MULTIPLIER_CONFIG, "2.0");
     props.setProperty(KafkaCruiseControlConfig.ANOMALY_DETECTION_ALLOW_CAPACITY_ESTIMATION_CONFIG,
                       Boolean.toString(DEFAULT_ANOMALY_DETECTION_ALLOW_CAPACITY_ESTIMATION_CONFIG));
-    props.setProperty(KafkaCruiseControlConfig.BROKER_FAILURE_EXCLUDE_RECENTLY_DEMOTED_BROKERS_CONFIG,
-                      Boolean.toString(DEFAULT_BROKER_FAILURE_EXCLUDE_RECENT_BROKERS_CONFIG));
-    props.setProperty(KafkaCruiseControlConfig.BROKER_FAILURE_EXCLUDE_RECENTLY_REMOVED_BROKERS_CONFIG,
-                      Boolean.toString(DEFAULT_BROKER_FAILURE_EXCLUDE_RECENT_BROKERS_CONFIG));
-    props.setProperty(KafkaCruiseControlConfig.GOAL_VIOLATION_EXCLUDE_RECENTLY_DEMOTED_BROKERS_CONFIG,
-                      Boolean.toString(DEFAULT_GOAL_VIOLATION_EXCLUDE_RECENT_BROKERS_CONFIG));
-    props.setProperty(KafkaCruiseControlConfig.GOAL_VIOLATION_EXCLUDE_RECENTLY_REMOVED_BROKERS_CONFIG,
-                      Boolean.toString(DEFAULT_GOAL_VIOLATION_EXCLUDE_RECENT_BROKERS_CONFIG));
+    props.setProperty(KafkaCruiseControlConfig.SELF_HEALING_EXCLUDE_RECENTLY_DEMOTED_BROKERS_CONFIG,
+                      Boolean.toString(DEFAULT_SELF_HEALING_EXCLUDE_RECENT_BROKERS_CONFIG));
+    props.setProperty(KafkaCruiseControlConfig.SELF_HEALING_EXCLUDE_RECENTLY_REMOVED_BROKERS_CONFIG,
+                      Boolean.toString(DEFAULT_SELF_HEALING_EXCLUDE_RECENT_BROKERS_CONFIG));
     props.setProperty(KafkaCruiseControlConfig.SELF_HEALING_GOALS_CONFIG, "");
     props.setProperty(
         KafkaCruiseControlConfig.DEFAULT_GOALS_CONFIG,

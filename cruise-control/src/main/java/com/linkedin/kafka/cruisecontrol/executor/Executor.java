@@ -47,7 +47,10 @@ import java.util.Collection;
 import java.util.List;
 
 import static com.linkedin.kafka.cruisecontrol.KafkaCruiseControlUtils.currentUtcDate;
+import static com.linkedin.kafka.cruisecontrol.KafkaCruiseControlUtils.toDateString;
 import static com.linkedin.kafka.cruisecontrol.KafkaCruiseControlUtils.OPERATION_LOGGER;
+import static com.linkedin.kafka.cruisecontrol.KafkaCruiseControlUtils.TIME_ZONE;
+import static com.linkedin.kafka.cruisecontrol.KafkaCruiseControlUtils.DATE_FORMAT;
 import static com.linkedin.kafka.cruisecontrol.executor.ExecutionTask.State.*;
 import static com.linkedin.kafka.cruisecontrol.executor.ExecutorState.State.*;
 import static com.linkedin.kafka.cruisecontrol.executor.ExecutionTask.TaskType.*;
@@ -74,6 +77,8 @@ public class Executor {
   private static final long PERMANENT_TIMESTAMP = 0L;
   private static final String ZK_EXECUTOR_METRIC_GROUP = "CruiseControlExecutor";
   private static final String ZK_EXECUTOR_METRIC_TYPE = "Executor";
+  // TODO: Make this configurable.
+  public static final long SLOW_TASK_ALERTING_BACKOFF_TIME_MS = 60000L;
   // The execution progress is controlled by the ExecutionTaskManager.
   private final ExecutionTaskManager _executionTaskManager;
   private final MetadataClient _metadataClient;
@@ -99,11 +104,12 @@ public class Executor {
   private volatile String _reason;
   private final ExecutorNotifier _executorNotifier;
 
-  private AtomicInteger _numExecutionStopped;
-  private AtomicInteger _numExecutionStoppedByUser;
-  private AtomicBoolean _executionStoppedByUser;
-  private AtomicInteger _numExecutionStartedInKafkaAssignerMode;
-  private AtomicInteger _numExecutionStartedInNonKafkaAssignerMode;
+  private final AtomicInteger _numExecutionStopped;
+  private final AtomicInteger _numExecutionStoppedByUser;
+  private final AtomicBoolean _executionStoppedByUser;
+  private final AtomicBoolean _ongoingExecutionIsBeingModified;
+  private final AtomicInteger _numExecutionStartedInKafkaAssignerMode;
+  private final AtomicInteger _numExecutionStartedInNonKafkaAssignerMode;
   private volatile boolean _isKafkaAssignerMode;
 
   private static final String EXECUTION_STARTED = "execution-started";
@@ -159,6 +165,7 @@ public class Executor {
     _numExecutionStopped = new AtomicInteger(0);
     _numExecutionStoppedByUser = new AtomicInteger(0);
     _executionStoppedByUser = new AtomicBoolean(false);
+    _ongoingExecutionIsBeingModified = new AtomicBoolean(false);
     _numExecutionStartedInKafkaAssignerMode = new AtomicInteger(0);
     _numExecutionStartedInNonKafkaAssignerMode = new AtomicInteger(0);
     _isKafkaAssignerMode = false;
@@ -205,6 +212,13 @@ public class Executor {
                                                          EXECUTION_HISTORY_SCANNER_INITIAL_DELAY_SECONDS,
                                                          EXECUTION_HISTORY_SCANNER_PERIOD_SECONDS,
                                                          TimeUnit.SECONDS);
+  }
+
+  /**
+   * @return The tasks that are {@link ExecutionTask.State#IN_PROGRESS} or {@link ExecutionTask.State#ABORTING} for all task types.
+   */
+  public Set<ExecutionTask> inExecutionTasks() {
+    return _executionTaskManager.inExecutionTasks();
   }
 
   /**
@@ -537,7 +551,7 @@ public class Executor {
                               Long replicationThrottle,
                               boolean isTriggeredByUserRequest) {
     _executionStoppedByUser.set(false);
-    sanityCheckOngoingReplicaMovement();
+    sanityCheckOngoingMovement();
     _hasOngoingExecution = true;
     _anomalyDetector.maybeClearOngoingAnomalyDetectionTimeMs();
     _stopSignal.set(NO_STOP_EXECUTION);
@@ -552,25 +566,28 @@ public class Executor {
   }
 
   /**
-   * Sanity check whether there are ongoing inter-broker or intra-broker replica movements.
+   * Sanity check whether there are ongoing (1) inter-broker or intra-broker replica movements or (2) leadership movements.
    */
-  private void sanityCheckOngoingReplicaMovement() {
+  private void sanityCheckOngoingMovement() {
     // Note that in case there is an ongoing partition reassignment, we do not unpause metric sampling.
     if (hasOngoingPartitionReassignments()) {
-      _executionTaskManager.clear();
-      _uuid = null;
-      _reason = null;
+      processOngoingMovementSanityCheckFailure();
       throw new IllegalStateException("There are ongoing inter-broker partition movements.");
-    }
-
-    if (isOngoingIntraBrokerReplicaMovement(_metadataClient.cluster().nodes().stream().mapToInt(Node::id).boxed()
-                                                           .collect(Collectors.toSet()),
-                                            _adminClient, _config)) {
-      _executionTaskManager.clear();
-      _uuid = null;
-      _reason = null;
+    } else if (isOngoingIntraBrokerReplicaMovement(_metadataClient.cluster().nodes().stream().mapToInt(Node::id).boxed()
+                                                                  .collect(Collectors.toSet()),
+                                                   _adminClient, _config)) {
+      processOngoingMovementSanityCheckFailure();
       throw new IllegalStateException("There are ongoing intra-broker partition movements.");
+    } else if (hasOngoingLeaderElection()) {
+      processOngoingMovementSanityCheckFailure();
+      throw new IllegalStateException("There are ongoing leadership movements.");
     }
+  }
+
+  private void processOngoingMovementSanityCheckFailure() {
+    _executionTaskManager.clear();
+    _uuid = null;
+    _reason = null;
   }
 
   /**
@@ -626,6 +643,17 @@ public class Executor {
   }
 
   /**
+   * Let executor know the intention regarding modifying the ongoing execution. Only one request at a given time is
+   * allowed to modify the ongoing execution.
+   *
+   * @param modify True to indicate, false to cancel the intention to modify
+   * @return True if the intention changes the state known by executor, false otherwise.
+   */
+  public boolean modifyOngoingExecution(boolean modify) {
+    return _ongoingExecutionIsBeingModified.compareAndSet(!modify, modify);
+  }
+
+  /**
    * Whether there is an ongoing operation triggered by current Cruise Control deployment.
    *
    * @return True if there is an ongoing execution.
@@ -635,16 +663,26 @@ public class Executor {
   }
 
   /**
-   * Whether there is any ongoing partition reassignment.
-   * This method directly checks the existence of znode /admin/partition_reassignment.
+   * Check whether there is an ongoing partition reassignment.
+   * This method directly checks the existence of zNode in /admin/reassign_partitions.
    * Note this method returning false does not guarantee that there is no ongoing execution because when there is an ongoing
    * execution inside Cruise Control, partition reassignment task batches are writen to zookeeper periodically, there will be
    * small intervals that /admin/partition_reassignment does not exist.
    *
-   * @return True if there is any ongoing partition reassignment.
+   * @return True if there is an ongoing partition reassignment.
    */
   public boolean hasOngoingPartitionReassignments() {
     return !ExecutorUtils.partitionsBeingReassigned(_kafkaZkClient).isEmpty();
+  }
+
+  /**
+   * Check whether there is an ongoing leadership reassignment.
+   * This method directly checks the existence of zNode in /admin/preferred_replica_election.
+   *
+   * @return True if there is an ongoing leadership reassignment.
+   */
+  public boolean hasOngoingLeaderElection() {
+    return !ExecutorUtils.ongoingLeaderElection(_kafkaZkClient).isEmpty();
   }
 
   /**
@@ -661,6 +699,7 @@ public class Executor {
     private final Long _replicationThrottle;
     private Throwable _executionException;
     private boolean _isTriggeredByUserRequest;
+    private long _lastSlowTaskReportingTimeMs;
 
     ProposalExecutionRunnable(LoadMonitor loadMonitor,
                               Collection<Integer> demotedBrokers,
@@ -700,18 +739,17 @@ public class Executor {
       _recentlyRemovedBrokers = recentlyRemovedBrokers();
       _replicationThrottle = replicationThrottle;
       _isTriggeredByUserRequest = isTriggeredByUserRequest;
+      _lastSlowTaskReportingTimeMs = -1L;
     }
 
     public void run() {
       LOG.info("Starting executing balancing proposals.");
-      execute();
+      UserTaskManager.UserTaskInfo userTaskInfo = initExecution();
+      execute(userTaskInfo);
       LOG.info("Execution finished.");
     }
 
-    /**
-     * Start the actual execution of the proposals in order: First move replicas, then transfer leadership.
-     */
-    private void execute() {
+    private UserTaskManager.UserTaskInfo initExecution() {
       UserTaskManager.UserTaskInfo userTaskInfo = null;
       // If the task is triggered from a user request, mark the task to be in-execution state in user task manager and
       // retrieve the associated user task information.
@@ -721,6 +759,22 @@ public class Executor {
       _state = STARTING_EXECUTION;
       _executorState = ExecutorState.executionStarted(_uuid, _reason, _recentlyDemotedBrokers, _recentlyRemovedBrokers, _isTriggeredByUserRequest);
       OPERATION_LOG.info("Task [{}] execution starts. The reason of execution is {}.", _uuid, _reason);
+      _ongoingExecutionIsBeingModified.set(false);
+
+      return userTaskInfo;
+    }
+
+    /**
+     * Start the actual execution of the proposals in order:
+     * <ol>
+     *   <li>Inter-broker move replicas.</li>
+     *   <li>Intra-broker move replicas.</li>
+     *   <li>Transfer leadership.</li>
+     * </ol>
+     *
+     * @param userTaskInfo The task information if the task is triggered from a user request, {@code null} otherwise.
+     */
+    private void execute(UserTaskManager.UserTaskInfo userTaskInfo) {
       try {
         // Pause the metric sampling to avoid the loss of accuracy during execution.
         while (true) {
@@ -792,37 +846,38 @@ public class Executor {
 
         // 4. Delete tasks from Zookeeper if needed.
         if (_state == STOPPING_EXECUTION && _stopSignal.get() == FORCE_STOP_EXECUTION) {
-          deleteZnodesToStopExecution();
+          deleteZNodesToStopExecution();
         }
       } catch (Throwable t) {
         LOG.error("Executor got exception during execution", t);
         _executionException = t;
       } finally {
-        // If the finished task was triggered by a user request, update task status in user task manager; if task is triggered
-        // by an anomaly self-healing, update the task status in anomaly detector.
-        if (userTaskInfo != null) {
-          _userTaskManager.markTaskExecutionFinished(_uuid, _executorState.state() == STOPPING_EXECUTION || _executionException != null);
-        } else {
-          _anomalyDetector.markSelfHealingFinished(_uuid);
-        }
-
-        if (_executorState.state() == STOPPING_EXECUTION) {
-          notifyExecutionFinished(String.format("Task [%s] execution for %s is stopped by %s.", _uuid,
-                                                userTaskInfo != null ? ("user request " + userTaskInfo.requestUrl()) : "self-healing",
-                                                _executionStoppedByUser.get() ? "user" : "Cruise Control"),
-                                  true);
-        } else if (_executionException != null) {
-          notifyExecutionFinished(String.format("Task [%s] execution for %s is interrupted with exception %s.", _uuid,
-                                                userTaskInfo != null ? ("user request " + userTaskInfo.requestUrl()) : "self-healing",
-                                                _executionException.getMessage()),
-                                  true);
-        } else {
-          notifyExecutionFinished(String.format("Task [%s] execution for %s finished.", _uuid,
-                                                userTaskInfo != null ? ("user request " + userTaskInfo.requestUrl()) : "self-healing"),
-                                  false);
-        }
+        notifyFinishedTask(userTaskInfo);
         // Clear completed execution.
         clearCompletedExecution();
+      }
+    }
+
+    private void notifyFinishedTask(UserTaskManager.UserTaskInfo userTaskInfo) {
+      // If the finished task was triggered by a user request, update task status in user task manager; if task is triggered
+      // by an anomaly self-healing, update the task status in anomaly detector.
+      if (userTaskInfo != null) {
+        _userTaskManager.markTaskExecutionFinished(_uuid, _executorState.state() == STOPPING_EXECUTION || _executionException != null);
+      } else {
+        _anomalyDetector.markSelfHealingFinished(_uuid);
+      }
+
+      String prefix = String.format("Task [%s] %s execution is ", _uuid,
+                                    userTaskInfo != null ? ("user" + userTaskInfo.requestUrl()) : "self-healing");
+
+      if (_executorState.state() == STOPPING_EXECUTION) {
+        notifyExecutionFinished(String.format("%sstopped by %s.", prefix, _executionStoppedByUser.get() ? "user" : "Cruise Control"),
+                                true);
+      } else if (_executionException != null) {
+        notifyExecutionFinished(String.format("%sinterrupted with exception %s.", prefix, _executionException.getMessage()),
+                                true);
+      } else {
+        notifyExecutionFinished(String.format("%sfinished.", prefix), false);
       }
     }
 
@@ -917,7 +972,7 @@ public class Executor {
 
       int partitionsToMove = numTotalPartitionMovements;
       // Exhaust all the pending partition movements.
-      while ((partitionsToMove > 0 || !_executionTaskManager.inExecutionTasks().isEmpty()) && _stopSignal.get() == NO_STOP_EXECUTION) {
+      while ((partitionsToMove > 0 || !inExecutionTasks().isEmpty()) && _stopSignal.get() == NO_STOP_EXECUTION) {
         // Get tasks to execute.
         List<ExecutionTask> tasksToExecute = _executionTaskManager.getInterBrokerReplicaMovementTasks();
         LOG.info("Executor will execute {} task(s)", tasksToExecute.size());
@@ -944,15 +999,15 @@ public class Executor {
       }
       // After the partition movement finishes, wait for the controller to clean the reassignment zkPath. This also
       // ensures a clean stop when the execution is stopped in the middle.
-      Set<ExecutionTask> inExecutionTasks = _executionTaskManager.inExecutionTasks();
+      Set<ExecutionTask> inExecutionTasks = inExecutionTasks();
       while (!inExecutionTasks.isEmpty()) {
         LOG.info("Waiting for {} tasks moving {} MB to finish.", inExecutionTasks.size(),
                  _executionTaskManager.inExecutionInterBrokerDataToMoveInMB());
         List<ExecutionTask> completedRemainingTasks = waitForExecutionTaskToFinish();
-        inExecutionTasks = _executionTaskManager.inExecutionTasks();
+        inExecutionTasks = inExecutionTasks();
         throttleHelper.clearThrottles(completedRemainingTasks, new ArrayList<>(inExecutionTasks));
       }
-      if (_executionTaskManager.inExecutionTasks().isEmpty()) {
+      if (inExecutionTasks().isEmpty()) {
         LOG.info("Inter-broker partition movements finished.");
       } else if (_stopSignal.get() != NO_STOP_EXECUTION) {
         ExecutionTasksSummary executionTasksSummary = _executionTaskManager.getExecutionTasksSummary(Collections.emptySet());
@@ -979,7 +1034,7 @@ public class Executor {
 
       int partitionsToMove = numTotalPartitionMovements;
       // Exhaust all the pending partition movements.
-      while ((partitionsToMove > 0 || !_executionTaskManager.inExecutionTasks().isEmpty()) && _stopSignal.get() == NO_STOP_EXECUTION) {
+      while ((partitionsToMove > 0 || !inExecutionTasks().isEmpty()) && _stopSignal.get() == NO_STOP_EXECUTION) {
         // Get tasks to execute.
         List<ExecutionTask> tasksToExecute = _executionTaskManager.getIntraBrokerReplicaMovementTasks();
         LOG.info("Executor will execute {} task(s)", tasksToExecute.size());
@@ -1001,14 +1056,14 @@ public class Executor {
             totalDataToMoveInMB == 0 ? 100 : String.format("%.2f", finishedDataToMoveInMB * UNIT_INTERVAL_TO_PERCENTAGE
                                                                    / totalDataToMoveInMB));
       }
-      Set<ExecutionTask> inExecutionTasks = _executionTaskManager.inExecutionTasks();
+      Set<ExecutionTask> inExecutionTasks = inExecutionTasks();
       while (!inExecutionTasks.isEmpty()) {
         LOG.info("Waiting for {} tasks moving {} MB to finish", inExecutionTasks.size(),
                  _executionTaskManager.inExecutionIntraBrokerDataMovementInMB());
         waitForExecutionTaskToFinish();
-        inExecutionTasks = _executionTaskManager.inExecutionTasks();
+        inExecutionTasks = inExecutionTasks();
       }
-      if (_executionTaskManager.inExecutionTasks().isEmpty()) {
+      if (inExecutionTasks().isEmpty()) {
         LOG.info("Intra-broker partition movements finished.");
       } else if (_stopSignal.get() != NO_STOP_EXECUTION) {
         ExecutionTasksSummary executionTasksSummary = _executionTaskManager.getExecutionTasksSummary(Collections.emptySet());
@@ -1037,7 +1092,7 @@ public class Executor {
         LOG.info("{}/{} ({}%) leadership movements completed.", numFinishedLeadershipMovements,
                  numTotalLeadershipMovements, numFinishedLeadershipMovements * 100 / numTotalLeadershipMovements);
       }
-      if (_executionTaskManager.inExecutionTasks().isEmpty()) {
+      if (inExecutionTasks().isEmpty()) {
         LOG.info("Leadership movements finished.");
       } else if (_stopSignal.get() != NO_STOP_EXECUTION) {
         Map<ExecutionTask.State, Integer> leadershipMovementTasksByState =
@@ -1059,36 +1114,48 @@ public class Executor {
       LOG.debug("Executing {} leadership movements in a batch.", numLeadershipToMove);
       // Execute the leadership movements.
       if (!leadershipMovementTasks.isEmpty() && _stopSignal.get() == NO_STOP_EXECUTION) {
+        // Run preferred leader election unless there is already an ongoing leadership movement.
+        while (hasOngoingLeaderElection()) {
+          try {
+            LOG.error("Waiting for Kafka Controller to delete /admin/preferred_replica_election zNode. Are other admin "
+                      + "tools triggering a PLE?");
+            Thread.sleep(executionProgressCheckIntervalMs());
+          } catch (InterruptedException e) {
+            LOG.warn("Interrupted while waiting for Kafka Controller to delete /admin/preferred_replica_election zNode.");
+          }
+        }
         // Mark leadership movements in progress.
         _executionTaskManager.markTasksInProgress(leadershipMovementTasks);
 
-        // Run preferred leader election.
         ExecutorUtils.executePreferredLeaderElection(_kafkaZkClient, leadershipMovementTasks);
         LOG.trace("Waiting for leadership movement batch to finish.");
-        while (!_executionTaskManager.inExecutionTasks().isEmpty() && _stopSignal.get() == NO_STOP_EXECUTION) {
+        while (!inExecutionTasks().isEmpty() && _stopSignal.get() == NO_STOP_EXECUTION) {
           waitForExecutionTaskToFinish();
         }
       }
       return numLeadershipToMove;
     }
 
-    private void deleteZnodesToStopExecution() {
-      // Delete znode of ongoing replica movement tasks.
-      LOG.info("Deleting znode for ongoing replica movements {}.", _kafkaZkClient.getPartitionReassignment());
+    private void deleteZNodesToStopExecution() {
+      // Delete zNode of ongoing replica movement tasks.
+      LOG.info("Deleting zNode for ongoing replica movements {}.", _kafkaZkClient.getPartitionReassignment());
       _kafkaZkClient.deletePartitionReassignment(ZkVersion.MatchAnyVersion());
-      // delete znode of ongoing leadership movement tasks.
-      LOG.info("Deleting znode for ongoing leadership changes {}.", _kafkaZkClient.getPreferredReplicaElection());
+      // delete zNode of ongoing leadership movement tasks.
+      LOG.info("Deleting zNode for ongoing leadership changes {}.", _kafkaZkClient.getPreferredReplicaElection());
       _kafkaZkClient.deletePreferredReplicaElection(ZkVersion.MatchAnyVersion());
-      // Delete controller znode to trigger a controller re-election.
-      LOG.info("Deleting controller znode to re-elect a new controller. Old controller is {}.", _kafkaZkClient.getControllerId());
+      // Delete controller zNode to trigger a controller re-election.
+      LOG.info("Deleting controller zNode to re-elect a new controller. Old controller is {}.", _kafkaZkClient.getControllerId());
       _kafkaZkClient.deleteController(ZkVersion.MatchAnyVersion());
     }
 
     /**
-     * This method periodically check zookeeper to see if the partition reassignment has finished or not.
+     * This method periodically checks ZooKeeper to see if (1) partition or (2) leadership reassignment has finished or not.
      */
     private List<ExecutionTask> waitForExecutionTaskToFinish() {
       List<ExecutionTask> finishedTasks = new ArrayList<>();
+      Set<Long> forceStoppedTaskIds = new HashSet<>();
+      Set<Long> deletedTaskIds = new HashSet<>();
+      Set<Long> deadOrAbortingTaskIds = new HashSet<>();
       do {
         // If there is no finished tasks, we need to check if anything is blocked.
         maybeReexecuteTasks();
@@ -1104,19 +1171,23 @@ public class Executor {
             _adminClient, _config);
 
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Tasks in execution: {}", _executionTaskManager.inExecutionTasks());
+          LOG.debug("Tasks in execution: {}", inExecutionTasks());
         }
-        List<ExecutionTask> deadOrAbortingTasks = new ArrayList<>();
-        for (ExecutionTask task : _executionTaskManager.inExecutionTasks()) {
+        Set<ExecutionTask> deadOrAbortingNonLeadershipTasks = new HashSet<>();
+        List<ExecutionTask> slowTasksToReport = new ArrayList<>();
+        boolean shouldReportSlowTasks = _time.milliseconds() - _lastSlowTaskReportingTimeMs > SLOW_TASK_ALERTING_BACKOFF_TIME_MS;
+        for (ExecutionTask task : inExecutionTasks()) {
           TopicPartition tp = task.proposal().topicPartition();
           if (_stopSignal.get() == FORCE_STOP_EXECUTION) {
             LOG.debug("Task {} is marked as dead to force execution to stop.", task);
             finishedTasks.add(task);
+            forceStoppedTaskIds.add(task.executionId());
             _executionTaskManager.markTaskDead(task);
           } else if (cluster.partition(tp) == null) {
             // Handle topic deletion during the execution.
             LOG.debug("Task {} is marked as finished because the topic has been deleted", task);
             finishedTasks.add(task);
+            deletedTaskIds.add(task.executionId());
             _executionTaskManager.markTaskAborting(task);
             _executionTaskManager.markTaskDone(task);
           } else if (isTaskDone(cluster, logDirInfoByTask, tp, task)) {
@@ -1124,11 +1195,14 @@ public class Executor {
             finishedTasks.add(task);
             _executionTaskManager.markTaskDone(task);
           } else {
-            task.maybeReportExecutionTooSlow(_time.milliseconds(), _executorNotifier);
+            if (shouldReportSlowTasks) {
+              task.maybeReportExecutionTooSlow(_time.milliseconds(), slowTasksToReport);
+            }
             if (maybeMarkTaskAsDeadOrAborting(cluster, logDirInfoByTask, task)) {
+              deadOrAbortingTaskIds.add(task.executionId());
               // Only add the dead or aborted tasks to execute if it is not a leadership movement.
               if (task.type() != LEADER_ACTION) {
-                deadOrAbortingTasks.add(task);
+                deadOrAbortingNonLeadershipTasks.add(task);
               }
               // A dead or aborted task is considered as finished.
               if (task.state() == DEAD || task.state() == ABORTED) {
@@ -1137,21 +1211,45 @@ public class Executor {
             }
           }
         }
-        // TODO: Execute the dead or aborted tasks.
-        if (!deadOrAbortingTasks.isEmpty()) {
-          // TODO: re-enable this rollback action when KAFKA-6304 is available.
-          // ExecutorAdminUtils.executeReplicaReassignmentTasks(_kafkaZkClient, deadOrAbortingTasks);
-          if (_stopSignal.get() == NO_STOP_EXECUTION) {
-            // If there is task aborted or dead, we stop the execution.
-            LOG.info("Stop the ongoing proposal execution due to {} tasks are in dead or aborting status.\nTask details: {}",
-                     deadOrAbortingTasks.size(), deadOrAbortingTasks);
-            stopExecution(false);
-          }
-        }
+        handleDeadOrAbortingTasks(deadOrAbortingNonLeadershipTasks, slowTasksToReport);
         updateOngoingExecutionState();
-      } while (!_executionTaskManager.inExecutionTasks().isEmpty() && finishedTasks.isEmpty());
-      LOG.info("Completed tasks: {}", finishedTasks);
+      } while (!inExecutionTasks().isEmpty() && finishedTasks.isEmpty());
+
+      LOG.info("Completed tasks: {}.{}{}{}", finishedTasks,
+               forceStoppedTaskIds.isEmpty() ? "" : String.format("%n[Force-stopped: %s]", forceStoppedTaskIds),
+               deletedTaskIds.isEmpty() ? "" : String.format("%n[Deleted: %s]", deletedTaskIds),
+               deadOrAbortingTaskIds.isEmpty() ? "" : String.format("%n[Dead/aborting: %s]", deadOrAbortingTaskIds));
+
       return finishedTasks;
+    }
+
+    private void handleDeadOrAbortingTasks(Set<ExecutionTask> deadOrAbortingNonLeadershipTasks,
+                                           List<ExecutionTask> slowTasksToReport) {
+      if (!slowTasksToReport.isEmpty()) {
+        sendSlowExecutionAlert(slowTasksToReport);
+      }
+
+      if (!deadOrAbortingNonLeadershipTasks.isEmpty()) {
+        // TODO: Rollback tasks when KIP-455 is available.
+        // ExecutorAdminUtils.executeReplicaReassignmentTasks(_kafkaZkClient, deadOrAbortingTasks);
+        if (_stopSignal.get() == NO_STOP_EXECUTION) {
+          // If there is task aborted or dead, we stop the execution.
+          LOG.info("Stop the ongoing execution due to {} dead or aborting tasks: {}.",
+                   deadOrAbortingNonLeadershipTasks.size(), deadOrAbortingNonLeadershipTasks);
+          stopExecution(false);
+        }
+      }
+    }
+
+    private void sendSlowExecutionAlert(List<ExecutionTask> slowTasksToReport) {
+      StringBuilder sb = new StringBuilder();
+      sb.append("Slow tasks are detected:\n");
+      for (ExecutionTask task: slowTasksToReport) {
+        sb.append(String.format("\tID: %s\tstart_time:%s\tdetail:%s%n", task.executionId(),
+                                toDateString(task.startTimeMs(), DATE_FORMAT, TIME_ZONE), task));
+      }
+      _executorNotifier.sendAlert(sb.toString());
+      _lastSlowTaskReportingTimeMs = _time.milliseconds();
     }
 
     /**
@@ -1265,11 +1363,11 @@ public class Executor {
           case LEADER_ACTION:
             if (cluster.nodeById(task.proposal().newLeader().brokerId()) == null) {
               _executionTaskManager.markTaskDead(task);
-              LOG.warn("Killing execution for task {} because the target leader is down", task);
+              LOG.warn("Killing execution for task {} because the target leader is down.", task);
               return true;
             } else if (_time.milliseconds() > task.startTimeMs() + _leaderMovementTimeoutMs) {
               _executionTaskManager.markTaskDead(task);
-              LOG.warn("Failed task {} because it took longer than {} to finish.", task, _leaderMovementTimeoutMs);
+              LOG.warn("Killing execution for task {} because it took longer than {} to finish.", task, _leaderMovementTimeoutMs);
               return true;
             }
             break;
@@ -1348,7 +1446,7 @@ public class Executor {
       // Only reexecute leader actions if there is no replica actions running.
       if (interBrokerReplicaActionsToReexecute.isEmpty() &&
           intraBrokerReplicaActionsToReexecute.isEmpty() &&
-          ExecutorUtils.ongoingLeaderElection(_kafkaZkClient).isEmpty()) {
+          !hasOngoingLeaderElection()) {
         List<ExecutionTask> leaderActionsToReexecute = new ArrayList<>(_executionTaskManager.inExecutionTasks(Collections.singleton(LEADER_ACTION)));
         if (!leaderActionsToReexecute.isEmpty()) {
           LOG.info("Reexecuting tasks {}", leaderActionsToReexecute);

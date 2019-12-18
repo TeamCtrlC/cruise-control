@@ -5,6 +5,7 @@
 package com.linkedin.kafka.cruisecontrol;
 
 import com.codahale.metrics.MetricRegistry;
+import com.linkedin.cruisecontrol.detector.AnomalyType;
 import com.linkedin.cruisecontrol.exception.NotEnoughValidWindowsException;
 import com.linkedin.kafka.cruisecontrol.analyzer.AnalyzerState;
 import com.linkedin.kafka.cruisecontrol.analyzer.OptimizationOptions;
@@ -17,7 +18,6 @@ import com.linkedin.kafka.cruisecontrol.config.KafkaCruiseControlConfig;
 import com.linkedin.kafka.cruisecontrol.config.TopicConfigProvider;
 import com.linkedin.kafka.cruisecontrol.detector.AnomalyDetector;
 import com.linkedin.kafka.cruisecontrol.detector.AnomalyDetectorState;
-import com.linkedin.kafka.cruisecontrol.detector.notifier.AnomalyType;
 import com.linkedin.kafka.cruisecontrol.exception.KafkaCruiseControlException;
 import com.linkedin.kafka.cruisecontrol.executor.ExecutionProposal;
 import com.linkedin.kafka.cruisecontrol.executor.Executor;
@@ -56,6 +56,7 @@ import org.slf4j.LoggerFactory;
 
 import static com.linkedin.kafka.cruisecontrol.KafkaCruiseControlUtils.goalsByPriority;
 import static com.linkedin.kafka.cruisecontrol.servlet.handler.async.runnable.RunnableUtils.partitionWithOfflineReplicas;
+import static com.linkedin.kafka.cruisecontrol.servlet.parameters.ParameterUtils.STOP_ONGOING_EXECUTION_PARAM;
 
 
 /**
@@ -194,23 +195,50 @@ public class KafkaCruiseControl {
   }
 
   /**
-   * Sanity check that if current request is not a dryrun, there is
-   * (1) no ongoing execution in current Cruise Control deployment.
-   * (2) no ongoing partition reassignment, which could be triggered by other admin tools or previous Cruise Control deployment.
-   * This method helps to fail fast if a user attempts to start an execution during an ongoing admin operation.
+   * Sanity check that if current request is not a dryrun, then there is no ongoing
+   * <ol>
+   *   <li>execution in current Cruise Control deployment and user does not require stopping the ongoing execution,</li>
+   *   <li>partition reassignment triggered by other admin tools or previous Cruise Control deployment.</li>
+   *   <li>leadership reassignment triggered by other admin tools or previous Cruise Control deployment.</li>
+   * </ol>
+   *
+   * This method helps to fail fast if a user attempts to start an execution during an ongoing execution.
    *
    * @param dryRun True if the request is just a dryrun, false if the intention is to start an execution.
+   * @param stopOngoingExecution True to stop the ongoing execution (if any) and start executing the given proposals,
+   *                             false otherwise.
    */
-  public void sanityCheckDryRun(boolean dryRun) {
+  public void sanityCheckDryRun(boolean dryRun, boolean stopOngoingExecution) {
     if (dryRun) {
       return;
     }
-    if (_executor.hasOngoingExecution()) {
-      throw new IllegalStateException("Cannot execute new proposals while there is an ongoing execution.");
-    }
-    if (_executor.hasOngoingPartitionReassignments()) {
+    if (_executor.hasOngoingExecution() && !stopOngoingExecution) {
+      throw new IllegalStateException(String.format("Cannot start a new execution while there is an ongoing execution. "
+                                                    + "Please use %s=true to stop ongoing execution and start a new one.",
+                                                    STOP_ONGOING_EXECUTION_PARAM));
+    } else if (_executor.hasOngoingPartitionReassignments()) {
       throw new IllegalStateException("Cannot execute new proposals while there are ongoing partition reassignments.");
+    } else if (_executor.hasOngoingLeaderElection()) {
+      throw new IllegalStateException("Cannot execute new proposals while there are ongoing leadership reassignments.");
     }
+  }
+
+  /**
+   * @return True if there is an ongoing execution started by Cruise Control.
+   */
+  public boolean hasOngoingExecution() {
+    return _executor.hasOngoingExecution();
+  }
+
+  /**
+   * Let executor know the intention regarding modifying the ongoing execution. Only one request at a given time is
+   * allowed to modify the ongoing execution.
+   *
+   * @param modify True to indicate, false to cancel the intention to modify
+   * @return True if the intention changes the state known by executor, false otherwise.
+   */
+  public boolean modifyOngoingExecution(boolean modify) {
+    return _executor.modifyOngoingExecution(modify);
   }
 
   /**
@@ -514,7 +542,7 @@ public class KafkaCruiseControl {
                                String uuid,
                                String reason) {
     if (hasProposalsToExecute(proposals, uuid)) {
-      // Set the execution mode, add execution proposals, and start execution.
+      // Set the execution mode and start execution.
       _executor.setExecutionMode(isKafkaAssignerMode);
       _executor.executeProposals(proposals, unthrottledBrokers, null, _loadMonitor,
                                  concurrentInterBrokerPartitionMovements, concurrentIntraBrokerPartitionMovements,
@@ -556,7 +584,7 @@ public class KafkaCruiseControl {
                              String uuid,
                              String reason) {
     if (hasProposalsToExecute(proposals, uuid)) {
-      // Set the execution mode, add execution proposals, and start execution.
+      // Set the execution mode and start execution.
       _executor.setExecutionMode(isKafkaAssignerMode);
       _executor.executeProposals(proposals, throttleDecommissionedBroker ? Collections.emptySet() : removedBrokers,
                                  removedBrokers, _loadMonitor, concurrentInterBrokerPartitionMovements, 0,
@@ -601,7 +629,7 @@ public class KafkaCruiseControl {
                             : _config.getInt(KafkaCruiseControlConfig.NUM_CONCURRENT_LEADER_MOVEMENTS_CONFIG);
       concurrentSwaps = Math.min(_config.getInt(KafkaCruiseControlConfig.MAX_NUM_CLUSTER_MOVEMENTS_CONFIG) / brokerCount, concurrentSwaps);
 
-      // Set the execution mode, add execution proposals, and start execution.
+      // Set the execution mode and start execution.
       _executor.setExecutionMode(false);
       _executor.executeDemoteProposals(proposals, demotedBrokers, _loadMonitor, concurrentSwaps, concurrentLeaderMovements,
                                        executionProgressCheckIntervalMs, replicaMovementStrategy, replicationThrottle,
@@ -616,6 +644,13 @@ public class KafkaCruiseControl {
    */
   public void userTriggeredStopExecution(boolean forceExecutionStop) {
     _executor.userTriggeredStopExecution(forceExecutionStop);
+  }
+
+  /**
+   * @return The interval between checking and updating (if needed) the progress of an initiated execution.
+   */
+  public long executionProgressCheckIntervalMs() {
+    return _executor.executionProgressCheckIntervalMs();
   }
 
   /**
@@ -636,22 +671,21 @@ public class KafkaCruiseControl {
    * Get the state of the load monitor.
    *
    * @param operationProgress The progress for the job.
-   * @param clusterAndGeneration The current cluster and generation.
+   * @param cluster Kafka cluster.
    * @return The state of the load monitor.
    */
-  public LoadMonitorState monitorState(OperationProgress operationProgress,
-                                       MetadataClient.ClusterAndGeneration clusterAndGeneration) {
-    return _loadMonitor.state(operationProgress, clusterAndGeneration);
+  public LoadMonitorState monitorState(OperationProgress operationProgress, Cluster cluster) {
+    return _loadMonitor.state(operationProgress, cluster);
   }
 
   /**
    * Get the analyzer state from the goal optimizer.
    *
-   * @param clusterAndGeneration The current cluster and generation.
+   * @param cluster Kafka cluster.
    * @return The analyzer state.
    */
-  public AnalyzerState analyzerState(MetadataClient.ClusterAndGeneration clusterAndGeneration) {
-    return _goalOptimizer.state(clusterAndGeneration);
+  public AnalyzerState analyzerState(Cluster cluster) {
+    return _goalOptimizer.state(cluster);
   }
 
   /**
@@ -710,7 +744,7 @@ public class KafkaCruiseControl {
   public boolean meetCompletenessRequirements(List<String> goals) {
     MetadataClient.ClusterAndGeneration clusterAndGeneration = _loadMonitor.refreshClusterAndGeneration();
     return goalsByPriority(goals, _config).stream().allMatch(g -> _loadMonitor.meetCompletenessRequirements(
-        clusterAndGeneration, g.clusterModelCompletenessRequirements()));
+        clusterAndGeneration.cluster(), g.clusterModelCompletenessRequirements()));
   }
 
   /**

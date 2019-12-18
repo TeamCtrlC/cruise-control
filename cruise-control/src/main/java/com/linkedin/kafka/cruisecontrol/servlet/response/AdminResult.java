@@ -5,8 +5,8 @@
 package com.linkedin.kafka.cruisecontrol.servlet.response;
 
 import com.google.gson.Gson;
+import com.linkedin.cruisecontrol.detector.AnomalyType;
 import com.linkedin.kafka.cruisecontrol.config.KafkaCruiseControlConfig;
-import com.linkedin.kafka.cruisecontrol.detector.notifier.AnomalyType;
 import com.linkedin.cruisecontrol.servlet.parameters.CruiseControlParameters;
 import java.util.HashMap;
 import java.util.Map;
@@ -14,11 +14,15 @@ import java.util.Map;
 import static com.linkedin.kafka.cruisecontrol.servlet.response.ResponseUtils.JSON_VERSION;
 import static com.linkedin.kafka.cruisecontrol.servlet.response.ResponseUtils.VERSION;
 
-
+@JsonResponseClass
 public class AdminResult extends AbstractCruiseControlResponse {
+  @JsonResponseField(required = false)
   protected static final String SELF_HEALING_ENABLED_BEFORE = "selfHealingEnabledBefore";
+  @JsonResponseField(required = false)
   protected static final String SELF_HEALING_ENABLED_AFTER = "selfHealingEnabledAfter";
+  @JsonResponseField(required = false)
   protected static final String ONGOING_CONCURRENCY_CHANGE_REQUEST = "ongoingConcurrencyChangeRequest";
+  @JsonResponseField(required = false)
   protected static final String DROP_RECENT_BROKERS_REQUEST = "dropRecentBrokersRequest";
   protected final Map<AnomalyType, Boolean> _selfHealingEnabledBefore;
   protected final Map<AnomalyType, Boolean> _selfHealingEnabledAfter;

@@ -5,12 +5,13 @@
 package com.linkedin.kafka.cruisecontrol.servlet.parameters;
 
 import com.google.gson.Gson;
+import com.linkedin.cruisecontrol.detector.AnomalyType;
 import com.linkedin.cruisecontrol.servlet.parameters.CruiseControlParameters;
 import com.linkedin.kafka.cruisecontrol.analyzer.goals.IntraBrokerDiskCapacityGoal;
 import com.linkedin.kafka.cruisecontrol.analyzer.goals.IntraBrokerDiskUsageDistributionGoal;
 import com.linkedin.cruisecontrol.servlet.EndPoint;
 import com.linkedin.kafka.cruisecontrol.config.KafkaCruiseControlConfig;
-import com.linkedin.kafka.cruisecontrol.detector.notifier.AnomalyType;
+import com.linkedin.kafka.cruisecontrol.detector.notifier.KafkaAnomalyType;
 import com.linkedin.kafka.cruisecontrol.executor.strategy.BaseReplicaMovementStrategy;
 import com.linkedin.kafka.cruisecontrol.executor.strategy.ReplicaMovementStrategy;
 import com.linkedin.kafka.cruisecontrol.servlet.CruiseControlEndPoint;
@@ -64,6 +65,7 @@ public class ParameterUtils {
   public static final String END_MS_PARAM = "end";
   public static final String ENTRIES_PARAM = "entries";
   public static final String ALLOW_CAPACITY_ESTIMATION_PARAM = "allow_capacity_estimation";
+  public static final String STOP_ONGOING_EXECUTION_PARAM = "stop_ongoing_execution";
   public static final String CLEAR_METRICS_PARAM = "clearmetrics";
   public static final String TIME_PARAM = "time";
   public static final String VERBOSE_PARAM = "verbose";
@@ -258,6 +260,10 @@ public class ParameterUtils {
 
   static boolean skipRackAwarenessCheck(HttpServletRequest request) {
     return getBooleanParam(request, SKIP_RACK_AWARENESS_CHECK_PARAM, false);
+  }
+
+  static boolean stopOngoingExecution(HttpServletRequest request) {
+    return getBooleanParam(request, STOP_ONGOING_EXECUTION_PARAM, false);
   }
 
   private static boolean excludeBrokers(HttpServletRequest request, String parameter, boolean defaultIfMissing) {
@@ -555,11 +561,11 @@ public class ParameterUtils {
     Set<AnomalyType> anomalyTypes = new HashSet<>(selfHealingForString.size());
     try {
       for (String shfString : selfHealingForString) {
-        anomalyTypes.add(AnomalyType.valueOf(shfString.toUpperCase()));
+        anomalyTypes.add(KafkaAnomalyType.valueOf(shfString.toUpperCase()));
       }
     } catch (IllegalArgumentException iae) {
       throw new UserRequestException(String.format("Unsupported anomaly types in %s. Supported: %s",
-                                                   selfHealingForString, AnomalyType.cachedValues()));
+                                                   selfHealingForString, KafkaAnomalyType.cachedValues()));
     }
 
     return Collections.unmodifiableSet(anomalyTypes);

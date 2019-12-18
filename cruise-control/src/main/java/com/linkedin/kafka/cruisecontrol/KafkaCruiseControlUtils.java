@@ -180,14 +180,24 @@ public class KafkaCruiseControlUtils {
     if (goals != null && !goals.isEmpty() && !skipHardGoalCheck &&
         !(goals.size() == 1 && goals.get(0).equals(PreferredLeaderElectionGoal.class.getSimpleName()))) {
       sanityCheckNonExistingGoal(goals, AnalyzerUtils.getCaseInsensitiveGoalsByName(config));
-      Set<String> hardGoals = config.getList(KafkaCruiseControlConfig.HARD_GOALS_CONFIG).stream()
-                                    .map(goalName -> goalName.substring(goalName.lastIndexOf(".") + 1)).collect(Collectors.toSet());
+      Set<String> hardGoals = hardGoals(config);
       if (!goals.containsAll(hardGoals)) {
         throw new IllegalArgumentException(String.format("Missing hard goals %s in the provided goals: %s. Add %s=true "
                                                          + "parameter to ignore this sanity check.", hardGoals, goals,
                                                          SKIP_HARD_GOAL_CHECK_PARAM));
       }
     }
+  }
+
+  /**
+   * Get the set of configured hard goals.
+   *
+   * @param config The configurations for Cruise Control.
+   * @return The set of configured hard goals.
+   */
+  public static Set<String> hardGoals(KafkaCruiseControlConfig config) {
+    return config.getList(KafkaCruiseControlConfig.HARD_GOALS_CONFIG).stream()
+                 .map(goalName -> goalName.substring(goalName.lastIndexOf(".") + 1)).collect(Collectors.toSet());
   }
 
   /**
@@ -370,6 +380,7 @@ public class KafkaCruiseControlUtils {
       String securityProtocol = configs.getString(AdminClientConfig.SECURITY_PROTOCOL_CONFIG);
       adminClientConfigs.put(AdminClientConfig.SECURITY_PROTOCOL_CONFIG, securityProtocol);
       setStringConfigIfExists(configs, adminClientConfigs, SaslConfigs.SASL_MECHANISM);
+      setClassConfigIfExists(configs, adminClientConfigs, SaslConfigs.SASL_LOGIN_CALLBACK_HANDLER_CLASS);
       setPasswordConfigIfExists(configs, adminClientConfigs, SaslConfigs.SASL_JAAS_CONFIG);
 
       // Configure SSL configs (if security protocol is SSL or SASL_SSL)
@@ -455,6 +466,14 @@ public class KafkaCruiseControlUtils {
   private static void setStringConfigIfExists(KafkaCruiseControlConfig configs, Map<String, Object> props, String name) {
     try {
       props.put(name, configs.getString(name));
+    } catch (ConfigException ce) {
+      // let it go.
+    }
+  }
+
+  private static void setClassConfigIfExists(KafkaCruiseControlConfig configs, Map<String, Object> props, String name) {
+    try {
+      props.put(name, configs.getClass(name));
     } catch (ConfigException ce) {
       // let it go.
     }
