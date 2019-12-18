@@ -13,7 +13,7 @@ RemoveBrokerEndpoint:
           # default is a null set if no values are provided
       - name: dryrun
         in: query
-        description: Whether dry-run the request or not	
+        description: Whether to dry-run the request or not	
         schema: 
           type: boolean
           default: true
