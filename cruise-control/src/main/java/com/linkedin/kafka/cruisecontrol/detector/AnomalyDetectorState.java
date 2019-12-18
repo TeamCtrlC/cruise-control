@@ -31,6 +31,7 @@ import static com.linkedin.kafka.cruisecontrol.detector.notifier.KafkaAnomalyTyp
 import static com.linkedin.kafka.cruisecontrol.detector.notifier.KafkaAnomalyType.DISK_FAILURE;
 import com.linkedin.kafka.cruisecontrol.servlet.response.JsonResponseField;
 import com.linkedin.kafka.cruisecontrol.servlet.response.JsonResponseClass;
+import com.linkedin.kafka.cruisecontrol.servlet.response.JsonResponseExternalFields;
 
 @JsonResponseClass
 public class AnomalyDetectorState {
@@ -78,21 +79,14 @@ public class AnomalyDetectorState {
   @JsonResponseField
   private static final String METRICS = "metrics";
   @JsonResponseField
-  private static final String MEAN_TIME_BETWEEN_ANOMALIES_MS = "meanTimeBetweenAnomaliesMs";
-  @JsonResponseField
-  private static final String MEAN_TIME_TO_START_FIX_MS = "meanTimeToStartFixMs";
-  @JsonResponseField
   private static final String BALANCEDNESS_SCORE = "balancednessScore";
-  // Package private for testing.
-  static final String NUM_SELF_HEALING_STARTED = "numSelfHealingStarted";
-  private static final String ONGOING_ANOMALY_DURATION_MS = "ongoingAnomalyDurationMs";
   private static final long NO_ONGOING_ANOMALY_FLAG = -1L;
 
   // Recent anomalies with anomaly state by the anomaly type.
   private final Map<AnomalyType, Map<String, AnomalyState>> _recentAnomaliesByType;
   private Anomaly _ongoingSelfHealingAnomaly;
   private final Map<AnomalyType, Boolean> _selfHealingEnabled;
-  private Map<String, Float> _selfHealingEnabledRatio;
+  SelfHealingEnabledRatio _selfHealingEnabledRatio;
   // Maximum number of anomalies to keep in the anomaly detector state.
   private final int _numCachedRecentAnomalyStates;
   private AnomalyMetrics _metrics;
@@ -186,8 +180,8 @@ public class AnomalyDetectorState {
     }
 
     _metrics = new AnomalyMetrics(meanTimeBetweenAnomaliesMs, meanTimeToStartFixMs(), _numSelfHealingStarted.get(), ongoingAnomalyDurationMs());
-    _selfHealingEnabledRatio = new HashMap<>(selfHealingEnabledRatio.size());
-    selfHealingEnabledRatio.forEach((key, value) -> _selfHealingEnabledRatio.put(key.toString(), value));
+    _selfHealingEnabledRatio = new SelfHealingEnabledRatio(selfHealingEnabledRatio.size());
+    selfHealingEnabledRatio.forEach((key, value) -> _selfHealingEnabledRatio.put(key, value));
     _balancednessScore = balancednessScore;
   }
 
@@ -251,17 +245,11 @@ public class AnomalyDetectorState {
    * Package private for testing
    */
   Map<String, Object> metrics() {
-    Map<String, Object> metrics = new HashMap<>(4);
-    metrics.put(MEAN_TIME_BETWEEN_ANOMALIES_MS, _metrics.meanTimeBetweenAnomaliesMs());
-    metrics.put(MEAN_TIME_TO_START_FIX_MS, _metrics.meanTimeToStartFixMs());
-    metrics.put(NUM_SELF_HEALING_STARTED, _metrics.numSelfHealingStarted());
-    metrics.put(ONGOING_ANOMALY_DURATION_MS, _metrics.ongoingAnomalyDurationMs());
-
-    return metrics;
+    return new AnomalyMetricsValue(_metrics).getJsonMap();
   }
 
-  private Map<String, Float> selfHealingEnabledRatio() {
-    return _selfHealingEnabledRatio == null ? Collections.emptyMap() : _selfHealingEnabledRatio;
+  private SelfHealingEnabledRatio selfHealingEnabledRatio() {
+    return _selfHealingEnabledRatio == null ? new SelfHealingEnabledRatio(0) : _selfHealingEnabledRatio;
   }
 
   /**
@@ -430,5 +418,49 @@ public class AnomalyDetectorState {
                          ONGOING_SELF_HEALING_ANOMALY, _ongoingSelfHealingAnomaly == null
                                                        ? "None" : _ongoingSelfHealingAnomaly.anomalyId(),
                          BALANCEDNESS_SCORE, _balancednessScore);
+  }
+
+  protected class AnomalyMetricsValue {
+    @JsonResponseField
+    private static final String MEAN_TIME_BETWEEN_ANOMALIES_MS = "meanTimeBetweenAnomaliesMs";
+    @JsonResponseField
+    private static final String MEAN_TIME_TO_START_FIX_MS = "meanTimeToStartFixMs";
+    @JsonResponseField
+    static final String NUM_SELF_HEALING_STARTED = "numSelfHealingStarted";
+    @JsonResponseField
+    private static final String ONGOING_ANOMALY_DURATION_MS = "ongoingAnomalyDurationMs";
+
+    private AnomalyMetrics _metrics;
+
+    AnomalyMetricsValue(AnomalyMetrics metrics) {
+      _metrics = metrics;
+    }
+
+    protected Map<String, Object> getJsonMap() {
+      Map<String, Object> metrics = new HashMap<>(4);
+      metrics.put(MEAN_TIME_BETWEEN_ANOMALIES_MS, _metrics.meanTimeBetweenAnomaliesMs());
+      metrics.put(MEAN_TIME_TO_START_FIX_MS, _metrics.meanTimeToStartFixMs());
+      metrics.put(NUM_SELF_HEALING_STARTED, _metrics.numSelfHealingStarted());
+      metrics.put(ONGOING_ANOMALY_DURATION_MS, _metrics.ongoingAnomalyDurationMs());
+      return metrics;
+    }
+  }
+
+  @JsonResponseClass
+  @JsonResponseExternalFields(KafkaAnomalyType.class)
+  protected class SelfHealingEnabledRatio {
+    private Map<String, Float> _selfHealingEnabledRatioMap;
+
+    SelfHealingEnabledRatio(int size) {
+      _selfHealingEnabledRatioMap = new HashMap<>(size);
+    }
+
+    public void put(AnomalyType anomalyType, Float value) {
+      _selfHealingEnabledRatioMap.put(anomalyType.toString(), value);
+    }
+
+    protected Map<String, Float> toJsonStructure() {
+      return _selfHealingEnabledRatioMap;
+    }
   }
 }

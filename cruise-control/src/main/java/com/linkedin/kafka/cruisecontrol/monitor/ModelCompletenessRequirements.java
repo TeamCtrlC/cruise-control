@@ -3,8 +3,11 @@
  */
 
 package com.linkedin.kafka.cruisecontrol.monitor;
+import com.linkedin.kafka.cruisecontrol.servlet.response.JsonResponseClass;
+import com.linkedin.kafka.cruisecontrol.servlet.response.JsonResponseField;
 import java.util.HashMap;
 import java.util.Map;
+
 
 /**
  * This class is created to describe the requirements of the model. In Cruise Control, the requirement
@@ -30,9 +33,13 @@ import java.util.Map;
  * </ul>
  *
  */
+@JsonResponseClass
 public class ModelCompletenessRequirements {
+  @JsonResponseField
   private static final String REQUIRED_NUM_SNAPSHOTS = "requiredNumSnapshots";
+  @JsonResponseField
   private static final String MIN_MONITORED_PARTITION_PERCENTAGE = "minMonitoredPartitionsPercentage";
+  @JsonResponseField
   private static final String INCLUDE_ALL_TOPICS = "includeAllTopics";
   private final int _minRequiredNumWindows;
   private final double _minMonitoredPartitionsPercentage;

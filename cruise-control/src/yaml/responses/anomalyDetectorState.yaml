@@ -107,7 +107,7 @@ SelfHealingEnabledRatio:
       type: number
       format: float
 
-AnomalyMetrics:
+AnomalyMetricsValue:
   type: object
   required:
     - meanTimeBetweenAnomaliesMs
