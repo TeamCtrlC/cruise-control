@@ -149,11 +149,7 @@ RemoveBrokerEndpoint:
         content:
           application/json:
             schema:
-<<<<<<< HEAD
               $ref: '../responses/optimizationResult.yaml#/OptimizationResult'
-=======
-              $ref: '../responses/optimzationResult.yaml#/OptimizationResult'
->>>>>>> Fix branch from add-broker-schema to openapi-schemas for removeBroker.
           text/plain:
              schema:
                type: string
