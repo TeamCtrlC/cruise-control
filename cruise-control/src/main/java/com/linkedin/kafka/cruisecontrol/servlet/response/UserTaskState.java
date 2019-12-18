@@ -213,4 +213,40 @@ public class UserTaskState extends AbstractCruiseControlResponse {
     // Discard irrelevant response.
     _userTasks.clear();
   }
+  @JsonResponseClass
+  protected class UserTaskRecord {
+    @JsonResponseField
+    protected static final String TOPIC = "topic";
+    @JsonResponseField
+    protected static final String PARTITION = "partition";
+    @JsonResponseField
+    protected static final String LEADER = "leader";
+    @JsonResponseField
+    protected static final String FOLLOWERS = "followers";
+    @JsonResponseField
+    protected static final String MSG_IN = "msg_in";
+    protected Partition _partition;
+
+    PartitionLoadRecord(Partition partition) {
+      _partition = partition;
+    }
+
+    protected Map<String, Object> getJsonStructure() {
+      List<Integer> followers = _partition.followers().stream().map((replica) -> replica.broker().id()).collect(Collectors.toList());
+      Map<String, Object> record = new HashMap<>(9);
+      record.put(TOPIC, _partition.leader().topicPartition().topic());
+      record.put(PARTITION, _partition.leader().topicPartition().partition());
+      record.put(LEADER, _partition.leader().broker().id());
+      record.put(FOLLOWERS, followers);
+      record.put(Resource.CPU.resource(),
+                 _partition.leader().load().expectedUtilizationFor(Resource.CPU, _wantMaxLoad, _wantAvgLoad));
+      record.put(Resource.DISK.resource(),
+                 _partition.leader().load().expectedUtilizationFor(Resource.DISK, _wantMaxLoad, _wantAvgLoad));
+      record.put(Resource.NW_IN.resource(),
+                 _partition.leader().load().expectedUtilizationFor(Resource.NW_IN, _wantMaxLoad, _wantAvgLoad));
+      record.put(Resource.NW_OUT.resource(),
+                 _partition.leader().load().expectedUtilizationFor(Resource.NW_OUT, _wantMaxLoad, _wantAvgLoad));
+      record.put(MSG_IN, _partition.leader().load().expectedUtilizationFor(KafkaMetricDef.MESSAGE_IN_RATE, _wantMaxLoad, _wantAvgLoad));
+      return record;
+    }
 }

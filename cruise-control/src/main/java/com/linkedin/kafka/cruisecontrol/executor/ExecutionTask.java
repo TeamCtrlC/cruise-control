@@ -4,6 +4,8 @@
 
 package com.linkedin.kafka.cruisecontrol.executor;
 
+import com.linkedin.kafka.cruisecontrol.servlet.response.JsonResponseField;
+import com.linkedin.kafka.cruisecontrol.servlet.response.JsonResponseClass;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;

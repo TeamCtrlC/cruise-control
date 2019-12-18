@@ -6,6 +6,8 @@
 package com.linkedin.kafka.cruisecontrol.analyzer;
 
 import com.linkedin.kafka.cruisecontrol.analyzer.goals.Goal;
+import com.linkedin.kafka.cruisecontrol.servlet.response.JsonResponseField;
+import com.linkedin.kafka.cruisecontrol.servlet.response.JsonResponseClass;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -17,15 +19,23 @@ import java.util.HashMap;
 /**
  * The state for the analyzer.
  */
+@JsonResponseClass
 public class AnalyzerState {
+  @JsonResponseField
   private static final String IS_PROPOSAL_READY = "isProposalReady";
+  @JsonResponseField
   private static final String READY_GOALS = "readyGoals";
+  @JsonResponseField
   private static final String STATUS = "status";
   private static final String READY = "ready";
   private static final String NOT_READY = "notReady";
+  @JsonResponseField
   private static final String NAME = "name";
+  @JsonResponseField
   private static final String MODEL_COMPLETE_REQUIREMENT = "modelCompleteRequirement";
+  @JsonResponseField
   private static final String GOAL_READINESS = "goalReadiness";
+
   private final boolean _isProposalReady;
   private final Map<Goal, Boolean> _readyGoals;
 

@@ -1,4 +1,18 @@
-UserTask:
+UserTasksState:
+  type: object
+  required:
+    - userTasks
+    - version
+  properties:
+    userTasks:
+      type: array
+      items:
+        $ref: '#/UserTask'
+    version:
+      type: integer
+      format: int32
+
+UserTaskRecord:
   type: object
   required:
     - UserTaskId
@@ -24,17 +38,3 @@ UserTask:
         - CompletedWithError
     originalResponse:
       type: string
-
-UserTasksState:
-  type: object
-  required:
-    - userTasks
-    - version
-  properties:
-    userTasks:
-      type: array
-      items:
-        $ref: '#/UserTask'
-    version:
-      type: integer
-      format: int32
