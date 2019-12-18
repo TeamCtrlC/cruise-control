@@ -132,7 +132,7 @@ AddBrokerEndpoint:
         description: Used when two step verification is enabled, mutually exclusive with all other parameters
         schema:
           type: integer
-        # is required if two step verification is enabled so no default value  
+        # is required if two step verification is enabled so no default value
     responses:
       '200':
         description: |-

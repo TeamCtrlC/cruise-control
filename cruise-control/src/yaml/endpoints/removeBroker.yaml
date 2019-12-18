@@ -125,6 +125,12 @@ RemoveBrokerEndpoint:
           type: long
           format: int64
           minimum: 5000
+      - name: stop_ongoing_execution
+        in: query
+        description: Whether to stop the ongoing execution (if any) and start executing the given request
+        schema:
+          type: boolean
+          default: false
       - name: reason
         in: query
         description: Reason for request
