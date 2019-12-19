@@ -16,7 +16,7 @@ import static com.linkedin.kafka.cruisecontrol.detector.notifier.KafkaAnomalyTyp
 
 
 public class AnomalyMetrics {
-  private final Map<AnomalyType, Double> _meanTimeBetweenAnomaliesMs;
+  private final MeanTimeBetweenAnomalies _meanTimeBetweenAnomaliesMs;
   private final double _meanTimeToStartFixMs;
   private final long _numSelfHealingStarted;
   private final long _ongoingAnomalyDurationMs;

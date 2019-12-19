@@ -463,4 +463,18 @@ public class AnomalyDetectorState {
       return _selfHealingEnabledRatioMap;
     }
   }
+
+  @JsonResponseClass
+  @JsonResponseExternalFields(KafkaAnomalyType.class)
+  public class MeanTimeBetweenAnomalies {
+    private Map<AnomalyType, Double> _meanTimeBetweenAnomaliesMs = new HashMap<>(KafkaAnomalyType.cachedValues().size());
+    
+    public void put(AnomalyType anomalyType, Float value) {
+      _meanTimeBetweenAnomaliesMs.put(anomalyType.toString(), value);
+    }
+
+    protected Map<String, Float> toJsonStructure() {
+      return _meanTimeBetweenAnomaliesMss;
+    }
+  }
 }
