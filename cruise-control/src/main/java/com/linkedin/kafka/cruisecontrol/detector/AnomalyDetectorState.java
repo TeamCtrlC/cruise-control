@@ -438,4 +438,56 @@ public class AnomalyDetectorState {
       return _selfHealingEnabledRatioMap;
     }
   }
+
+  @JsonResponseClass
+  protected class AnomalyDetails {
+
+    public Map<String, Object> populateAnomalyDetails(AnomalyState anomalyState,
+                                                            AnomalyType anomalyType,
+                                                            boolean hasFixStarted,
+                                                            boolean isJson) {
+    // Goal violation has one more field than other anomaly types.
+    Map<String, Object> anomalyDetails = new HashMap<>((hasFixStarted ? 6 : 5) + (anomalyType == GOAL_VIOLATION ? 1 : 0));
+    anomalyDetails.put(isJson ? DETECTION_MS : DETECTION_DATE,
+                       isJson ? anomalyState.detectionMs() : utcDateFor(anomalyState.detectionMs()));
+    anomalyDetails.put(STATUS, anomalyState.status());
+    anomalyDetails.put(ANOMALY_ID, anomalyState.anomalyId());
+    anomalyDetails.put(isJson ? STATUS_UPDATE_MS : STATUS_UPDATE_DATE,
+                       isJson ? anomalyState.statusUpdateMs() : utcDateFor(anomalyState.statusUpdateMs()));
+    switch ((KafkaAnomalyType) anomalyType) {
+      case GOAL_VIOLATION:
+        GoalViolations goalViolations = (GoalViolations) anomalyState.anomaly();
+        Map<Boolean, List<String>> violatedGoalsByFixability = goalViolations.violatedGoalsByFixability();
+        anomalyDetails.put(FIXABLE_VIOLATED_GOALS, violatedGoalsByFixability.getOrDefault(true, Collections.emptyList()));
+        anomalyDetails.put(UNFIXABLE_VIOLATED_GOALS, violatedGoalsByFixability.getOrDefault(false, Collections.emptyList()));
+        if (hasFixStarted) {
+          anomalyDetails.put(OPTIMIZATION_RESULT, goalViolations.optimizationResult(isJson));
+        }
+        break;
+      case BROKER_FAILURE:
+        BrokerFailures brokerFailures = (BrokerFailures) anomalyState.anomaly();
+        anomalyDetails.put(FAILED_BROKERS_BY_TIME_MS, brokerFailures.failedBrokers());
+        if (hasFixStarted) {
+          anomalyDetails.put(OPTIMIZATION_RESULT, brokerFailures.optimizationResult(isJson));
+        }
+        break;
+      case DISK_FAILURE:
+        DiskFailures diskFailures = (DiskFailures) anomalyState.anomaly();
+        anomalyDetails.put(FAILED_DISKS_BY_TIME_MS, diskFailures.failedDisks());
+        if (hasFixStarted) {
+          anomalyDetails.put(OPTIMIZATION_RESULT, diskFailures.optimizationResult(isJson));
+        }
+        break;
+      case METRIC_ANOMALY:
+        KafkaMetricAnomaly metricAnomaly = (KafkaMetricAnomaly) anomalyState.anomaly();
+        anomalyDetails.put(DESCRIPTION, metricAnomaly.description());
+        if (hasFixStarted) {
+          anomalyDetails.put(OPTIMIZATION_RESULT, metricAnomaly.optimizationResult(isJson));
+        }
+        break;
+      default:
+        throw new IllegalStateException("Unrecognized anomaly type " + anomalyType);
+    }
+    return anomalyDetails;
+  }
 }
