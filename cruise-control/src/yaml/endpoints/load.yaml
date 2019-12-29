@@ -5,47 +5,46 @@ LoadEndpoint:
     parameters:
       - name: start
         in: query
-        description: Start time of the cluster load
+        description: Start time of the cluster load.
         schema:
           type: long
           format: int64
-          # Default is time of earliest valid window
+          # Default is time of earliest valid window.
       - name: end
         in: query
-        description: End time of the cluster load
+        description: End time of the cluster load.
         schema:
           type: long
           format: int64
-          # Default is current system time
+          # Default is current system time.
       - name: time
         in: query
-        description: End time of the clutser load
+        description: End time of the clutser load.
         schema:
           type: long
           format: int64
-        # Default is current system time, mutually exclusive from end parameter
+        # Default is current system time, mutually exclusive from end parameter.
       - name: allow_capacity_estimation
         in: query
-        description: Whether to allow capacity estimation when cruise-control is unable to obtain all per-broker capacity information
+        description: Whether to allow capacity estimation when cruise-control is unable to obtain all per-broker capacity information.
         schema:
           type: boolean
           default: true
       - name: json
         in: query
-        description: Whether to return in JSON format or not
+        description: Whether to return in JSON format or not.
         schema:
           type: boolean
           default: false
       - name: populate_disk_info
         in: query
-        description: Whether show the load of each disk of broker
+        description: Whether show the load of each disk of broker.
         schema:
           type: boolean
           default: false
     responses:
       '200':
-        description: |-
-          Successful load from valid partitions response
+        description: Successful load from valid partitions response.
         content:
           application/json:
             schema:
@@ -53,7 +52,7 @@ LoadEndpoint:
           text/plain:
              schema:
                type: string
-      # Response for all errors
+      # Response for all errors.
       default:
         description: Error response.
         content:
